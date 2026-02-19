@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import 'leaflet/dist/leaflet.css';
 
 @tailwind base;
 @tailwind components;
@@ -8,7 +9,7 @@
   * {
     box-sizing: border-box;
   }
-  
+
   body {
     @apply bg-sawaari-dark text-white font-sans;
     -webkit-font-smoothing: antialiased;
@@ -18,12 +19,15 @@
   ::-webkit-scrollbar {
     width: 6px;
   }
+
   ::-webkit-scrollbar-track {
     @apply bg-sawaari-dark;
   }
+
   ::-webkit-scrollbar-thumb {
     @apply bg-sawaari-border rounded-full;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-sawaari-muted;
   }
@@ -31,25 +35,19 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-500 to-primary-600 text-white font-semibold py-3 px-6 rounded-xl
-           hover:from-primary-600 hover:to-primary-700 active:scale-95 transition-all duration-200
-           shadow-lg shadow-primary-500/25 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-gradient-to-r from-primary-500 to-primary-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-primary-600 hover:to-primary-700 active:scale-95 transition-all duration-200 shadow-lg shadow-primary-500/25 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply bg-sawaari-card border border-sawaari-border text-white font-semibold py-3 px-6 rounded-xl
-           hover:bg-sawaari-border active:scale-95 transition-all duration-200;
+    @apply bg-sawaari-card border border-sawaari-border text-white font-semibold py-3 px-6 rounded-xl hover:bg-sawaari-border active:scale-95 transition-all duration-200;
   }
 
   .btn-ghost {
-    @apply text-sawaari-muted hover:text-white font-medium py-2 px-4 rounded-lg
-           hover:bg-white/5 active:scale-95 transition-all duration-200;
+    @apply text-sawaari-muted hover:text-white font-medium py-2 px-4 rounded-lg hover:bg-white/5 active:scale-95 transition-all duration-200;
   }
 
   .input-field {
-    @apply w-full bg-sawaari-card border border-sawaari-border text-white placeholder-sawaari-muted
-           rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-           transition-all duration-200;
+    @apply w-full bg-sawaari-card border border-sawaari-border text-white placeholder-sawaari-muted rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200;
   }
 
   .card {
@@ -57,8 +55,7 @@
   }
 
   .card-hover {
-    @apply card hover:border-primary-500/40 hover:shadow-lg hover:shadow-primary-500/10
-           transition-all duration-300 cursor-pointer;
+    @apply card hover:border-primary-500/40 hover:shadow-lg hover:shadow-primary-500/10 transition-all duration-300 cursor-pointer;
   }
 
   .glass {
@@ -78,20 +75,16 @@
   }
 
   .otp-input {
-    @apply w-12 h-14 text-center text-xl font-bold bg-sawaari-card border-2 border-sawaari-border
-           rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30
-           text-white transition-all duration-200;
+    @apply w-12 h-14 text-center text-xl font-bold bg-sawaari-card border-2 border-sawaari-border rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 text-white transition-all duration-200;
   }
 
   /* Chat bubbles */
   .bubble-sent {
-    @apply bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-2xl rounded-tr-sm
-           px-4 py-2.5 max-w-xs shadow-sm;
+    @apply bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-xs shadow-sm;
   }
 
   .bubble-received {
-    @apply bg-sawaari-border text-white rounded-2xl rounded-tl-sm
-           px-4 py-2.5 max-w-xs shadow-sm;
+    @apply bg-sawaari-border text-white rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-xs shadow-sm;
   }
 }
 
@@ -101,8 +94,15 @@
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -110,8 +110,13 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 /* Pink glow */

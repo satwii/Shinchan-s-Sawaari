@@ -11,7 +11,6 @@ const server = http.createServer(app);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'sawaari_secret';
 const PORT = process.env.PORT || 5000;
-// Allow any localhost port (3000, 3001, 3002...) — useful in dev when CRA picks a free port
 const CORS_ORIGIN = process.env.CLIENT_ORIGIN
     ? [process.env.CLIENT_ORIGIN]
     : (origin, callback) => {
@@ -59,7 +58,6 @@ io.on('connection', (socket) => {
     // Join a ride's chat room
     socket.on('join_ride_room', ({ rideId }) => {
         const db = getDb();
-        // Verify user is a member of this ride
         const isMember = db.prepare(
             `SELECT id FROM ride_members WHERE ride_id = ? AND user_id = ?`
         ).get(rideId, socket.userId);
@@ -81,7 +79,6 @@ io.on('connection', (socket) => {
 
         const db = getDb();
 
-        // Verify membership
         const isMember = db.prepare(
             `SELECT id FROM ride_members WHERE ride_id = ? AND user_id = ?`
         ).get(rideId, socket.userId);
@@ -91,7 +88,6 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Verify ride still exists
         const ride = db.prepare(`SELECT id FROM rides WHERE id = ?`).get(rideId);
         if (!ride) {
             socket.emit('error', { message: 'Ride not found' });
@@ -101,7 +97,6 @@ io.on('connection', (socket) => {
         const sanitizedContent = content.trim().substring(0, 1000);
         const sentAt = new Date().toISOString();
 
-        // Save message to DB
         const result = db.prepare(
             `INSERT INTO messages (ride_id, user_id, content, sent_at) VALUES (?, ?, ?, ?)`
         ).run(rideId, socket.userId, sanitizedContent, sentAt);
@@ -116,8 +111,14 @@ io.on('connection', (socket) => {
             sentAt
         };
 
-        // Broadcast to all room members (including sender)
         io.to(`ride_${rideId}`).emit('new_message', message);
+    });
+
+    // GPS location updates for live tracking
+    socket.on('location_update', ({ rideId, lat, lng }) => {
+        if (!rideId || lat === undefined || lng === undefined) return;
+        // Broadcast to all members in the ride room
+        io.to(`ride_${rideId}`).emit('live_location', { rideId, lat, lng, timestamp: new Date().toISOString() });
     });
 
     socket.on('disconnect', () => {
@@ -128,7 +129,9 @@ io.on('connection', (socket) => {
 // ─── ROUTES ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/rides', require('./routes/rides'));
-app.use('/api/ts', require('./routes/tripsService'));  // trips / bookings / payments / vehicles
+app.use('/api/ts', require('./routes/tripsService'));
+app.use('/api/agent', require('./routes/agent'));
+app.use('/api/transcribe', require('./routes/transcribe'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -147,7 +150,6 @@ app.use((err, req, res, next) => {
 });
 
 // ─── START ────────────────────────────────────────────────────────────────────
-// Initialize DB on startup
 getDb();
 
 server.listen(PORT, () => {

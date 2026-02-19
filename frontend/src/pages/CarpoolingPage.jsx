@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import RideCard from '../components/RideCard';
 import RegisterRideModal from '../components/RegisterRideModal';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const TIME_SLOTS = ['Early Morning', 'Morning', 'Afternoon', 'Evening', 'Night'];
 const TIME_SLOT_ICONS = {
@@ -21,6 +22,10 @@ export default function CarpoolingPage() {
     const [pinkMode, setPinkMode] = useState(false);
     const [source, setSource] = useState('');
     const [destination, setDestination] = useState('');
+    const [sourceLat, setSourceLat] = useState(null);
+    const [sourceLng, setSourceLng] = useState(null);
+    const [destinationLat, setDestinationLat] = useState(null);
+    const [destinationLng, setDestinationLng] = useState(null);
     const [date, setDate] = useState('');
     const [timeSlot, setTimeSlot] = useState('');
     const [maleCount, setMaleCount] = useState(0);
@@ -60,6 +65,8 @@ export default function CarpoolingPage() {
                 date: date || undefined,
                 timeSlot: timeSlot || undefined,
                 pinkMode,
+                sourceLat, sourceLng,
+                destinationLat, destinationLng,
             });
             setRides(res.data.rides || []);
         } catch (err) {
@@ -144,13 +151,21 @@ export default function CarpoolingPage() {
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="label">From</label>
-                                <input type="text" value={source} onChange={e => setSource(e.target.value)}
-                                    placeholder="Source area" className="input-field" />
+                                <LocationAutocomplete
+                                    value={source}
+                                    onChange={(v) => { setSource(v); setSourceLat(null); setSourceLng(null); }}
+                                    onSelect={({ name, lat, lon }) => { setSource(name); setSourceLat(lat); setSourceLng(lon); }}
+                                    placeholder="Source area"
+                                />
                             </div>
                             <div>
                                 <label className="label">To</label>
-                                <input type="text" value={destination} onChange={e => setDestination(e.target.value)}
-                                    placeholder="Destination" className="input-field" />
+                                <LocationAutocomplete
+                                    value={destination}
+                                    onChange={(v) => { setDestination(v); setDestinationLat(null); setDestinationLng(null); }}
+                                    onSelect={({ name, lat, lon }) => { setDestination(name); setDestinationLat(lat); setDestinationLng(lon); }}
+                                    placeholder="Destination"
+                                />
                             </div>
                         </div>
 
