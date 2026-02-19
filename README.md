@@ -3,6 +3,11 @@
 
 > **Sawaari** *(सवारी / சவாரி)* — A hyperlocal cab-sharing and carpooling platform built for real India. Not metro India. Not English-first India. All of India.
 
+<p align="center">
+  <img src="ss_login.jpeg" width="48%" alt="Sawaari Login"/>
+  <img src="ss_home.jpeg" width="48%" alt="Sawaari Home"/>
+</p>
+
 ---
 
 ## 🌟 The Problem
@@ -19,6 +24,21 @@ And every existing carpooling app assumes you're comfortable with forms, filters
 
 ## 🚀 Features
 
+## 📱 Screenshots
+
+### Onboarding & Signup
+<p align="center">
+  <img src="ss_login.jpeg" width="32%" alt="Phone Login"/>
+  <img src="ss_aadhaar.jpeg" width="32%" alt="Aadhaar Verification"/>
+  <img src="ss_profile.jpeg" width="32%" alt="Profile Setup"/>
+</p>
+
+> *5-step verified onboarding — Phone → Aadhaar → OTP → Profile → Emergency Contact*
+
+---
+
+## 🚀 Features
+
 ### 🚕 FareShare — Public Transport Sharing
 Connect with strangers heading the same way and split the cab fare. No vehicle ownership needed.
 
@@ -27,6 +47,18 @@ Connect with strangers heading the same way and split the cab fare. No vehicle o
 - **Autocomplete location search** powered by OpenStreetMap — type "Coimbatore railway" and get "Coimbatore Junction" just like Ola/Uber
 - Coordinate-based proximity matching for accurate route overlap detection
 - Rides auto-expire after scheduled time passes — no stale listings ever
+
+<p align="center">
+  <img src="ss_autocomplete.jpeg" width="32%" alt="Location Autocomplete"/>
+  <img src="ss_fareshare_results.jpeg" width="32%" alt="FareShare Ride Results"/>
+  <img src="ss_register_ride.jpeg" width="32%" alt="Register a Ride"/>
+</p>
+
+> *Smart location autocomplete · Ride cards with profile badges · Step-by-step ride registration*
+
+<p align="center">
+  <img src="ss_myrides.jpeg" width="48%" alt="My Rides"/>
+</p>
 
 ---
 
@@ -37,6 +69,22 @@ Own a vehicle? Offer seats on your daily route and earn while you commute.
 - Accept or decline join requests — **you choose your co-passengers**
 - Full driver profile visible to all potential passengers before they request
 - Same smart route matching and location autocomplete as FareShare
+
+<p align="center">
+  <img src="ss_driveshare_role.jpeg" width="32%" alt="Driver or Rider"/>
+  <img src="ss_driver_reg.jpeg" width="32%" alt="Driver Registration"/>
+  <img src="ss_vehicle.jpeg" width="32%" alt="Add Vehicle"/>
+</p>
+
+> *Choose your role · Register driving licence · Add vehicle details*
+
+<p align="center">
+  <img src="ss_create_trip.jpeg" width="32%" alt="Create Trip"/>
+  <img src="ss_driveshare_results.jpeg" width="32%" alt="DriveShare Results"/>
+  <img src="ss_mytrips.jpeg" width="32%" alt="My Trips"/>
+</p>
+
+> *Create trip with Pink Mode toggle · Browse carpool rides · Manage your trips*
 
 ---
 
@@ -89,6 +137,12 @@ Your safety net during every ride.
 ---
 
 ### 🔐 Identity & Trust System
+
+<p align="center">
+  <img src="ss_home.jpeg" width="60%" alt="Home — Verified Profile with Badges"/>
+</p>
+
+> *Aadhaar Verified ✓ · New to Sawaari 🌱 · Emergency Contact · Trip count — all visible at a glance*
 
 **Aadhaar Verification (Verhoeff Checksum)**
 - Every user verifies their Aadhaar number at signup
@@ -190,6 +244,13 @@ Set Emergency Contact (mandatory)
       ↓
 Home → FareShare / DriveShare
 ```
+
+<p align="center">
+  <img src="ss_login.jpeg" width="24%" alt="Step 1 - Phone"/>
+  <img src="ss_aadhaar.jpeg" width="24%" alt="Step 2 - Aadhaar"/>
+  <img src="ss_profile.jpeg" width="24%" alt="Step 3 - Profile"/>
+  <img src="ss_home.jpeg" width="24%" alt="Step 4 - Home"/>
+</p>
 
 ### Finding a Ride (App)
 ```
