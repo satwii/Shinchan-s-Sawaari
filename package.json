@@ -1,0 +1,11 @@
+{
+    "name": "sawaari",
+    "version": "1.0.0",
+    "description": "Sawaari - Hyperlocal Ride Sharing App",
+    "scripts": {
+        "start:backend": "cd backend && node server.js",
+        "start:frontend": "cd frontend && npm start",
+        "install:all": "cd backend && npm install && cd ../frontend && npm install",
+        "dev:backend": "cd backend && npm run dev"
+    }
+}
