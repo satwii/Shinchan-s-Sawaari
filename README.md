@@ -355,7 +355,7 @@ JWT_SECRET=<generate with: node -e "console.log(require('crypto').randomBytes(64
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/sawaari.git
+git clone https://github.com/satwii/Shinchan-s-Sawaari.git
 cd sawaari
 
 # Install dependencies
@@ -387,7 +387,7 @@ Safer than giving a lift to a random stranger on the road — because you know e
 
 ## 👥 Team
 
-Built with ❤️ for India at [Hackathon Name]
+Built with ❤️ for India 
 
 ---
 
