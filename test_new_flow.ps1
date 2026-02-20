@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-$base = "http://localhost:5000/api"
+$base = "https://sawaari-09bb.onrender.com/api"
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  SAWAARI NEW FLOW TEST" -ForegroundColor Cyan

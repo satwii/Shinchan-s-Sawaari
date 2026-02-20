@@ -112,6 +112,12 @@ A floating AI assistant lives on every page. Tap it and just speak — in Tamil,
 
 Sawaari hears it. Understands it. Finds the ride. Done.
 
+<p align="center">
+  <img src="ss_ai_chat.jpeg" width="55%" alt="Sawaari AI in action"/>
+</p>
+
+> *User typed "I WANT TO GO FROM COIMBATORE JUNCTION TO AMRITA VISHWA VIDYAPEETHAM TMRW 5 PM" — Sawaari AI understood the intent, searched the database, and returned a real ride card with a Request to Join button. No form. No filter. Just a sentence.*
+
 **What Sawaari AI can do:**
 - 🔍 Search rides by just describing where you want to go
 - 📝 Register a ride conversationally — no form filling

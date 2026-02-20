@@ -39,7 +39,7 @@ function RecenterMap({ lat, lng }) {
     return null;
 }
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || 'https://sawaari-09bb.onrender.com';
 
 export default function TrackRidePage() {
     const { token } = useParams();
