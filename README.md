@@ -1,88 +1,394 @@
-# 🚗 Sawaari — Hyperlocal Ride Sharing App
+# 🛺 Sawaari
+### *Because every empty seat is an opportunity*
 
-A fully functional hyperlocal ride-sharing platform built with React, Node.js/Express, SQLite, Socket.io, and JWT authentication.
+> **Sawaari** *(सवारी / சவாரி)* — A hyperlocal cab-sharing and carpooling platform built for real India. Not metro India. Not English-first India. All of India.
+
+<p align="center">
+  <img src="ss_login.jpeg" width="48%" alt="Sawaari Login"/>
+  <img src="ss_home.jpeg" width="48%" alt="Sawaari Home"/>
+</p>
 
 ---
 
-## 🚀 Getting Started
+## 🌟 The Problem
 
-### Prerequisites
-- Node.js v18+ 
-- npm
+Cab fares have skyrocketed. Splitting a ride is the obvious solution — but there's no reliable way to find someone heading the same direction, at the same time, from the same obscure starting point that isn't a railway station or bus stand.
 
-### 1. Install Dependencies
+So people either **overpay alone** or **don't travel at all.**
 
-**Backend:**
+And every existing carpooling app assumes you're comfortable with forms, filters, dropdowns, and English. That eliminates most of India before they even open the app.
+
+**Sawaari fixes all of that.**
+
+---
+
+## 🚀 Features
+
+## 📱 Screenshots
+
+### Onboarding & Signup
+<p align="center">
+  <img src="ss_login.jpeg" width="32%" alt="Phone Login"/>
+  <img src="ss_aadhaar.jpeg" width="32%" alt="Aadhaar Verification"/>
+  <img src="ss_profile.jpeg" width="32%" alt="Profile Setup"/>
+</p>
+
+> *5-step verified onboarding — Phone → Aadhaar → OTP → Profile → Emergency Contact*
+
+---
+
+## 🚀 Features
+
+### 🚕 FareShare — Public Transport Sharing
+Connect with strangers heading the same way and split the cab fare. No vehicle ownership needed.
+
+- Post a ride with source, destination, date, time and seat count
+- Browse available rides with smart **route overlap matching** — a ride from City A → City D appears if you're going B → C along the same route
+- **Autocomplete location search** powered by OpenStreetMap — type "Coimbatore railway" and get "Coimbatore Junction" just like Ola/Uber
+- Coordinate-based proximity matching for accurate route overlap detection
+- Rides auto-expire after scheduled time passes — no stale listings ever
+
+<p align="center">
+  <img src="ss_autocomplete.jpeg" width="32%" alt="Location Autocomplete"/>
+  <img src="ss_fareshare_results.jpeg" width="32%" alt="FareShare Ride Results"/>
+  <img src="ss_register_ride.jpeg" width="32%" alt="Register a Ride"/>
+</p>
+
+> *Smart location autocomplete · Ride cards with profile badges · Step-by-step ride registration*
+
+<p align="center">
+  <img src="ss_myrides.jpeg" width="48%" alt="My Rides"/>
+</p>
+
+---
+
+### 🚗 DriveShare — Carpooling
+Own a vehicle? Offer seats on your daily route and earn while you commute.
+
+- Register your vehicle with type, capacity and route details
+- Accept or decline join requests — **you choose your co-passengers**
+- Full driver profile visible to all potential passengers before they request
+- Same smart route matching and location autocomplete as FareShare
+
+<p align="center">
+  <img src="ss_driveshare_role.jpeg" width="32%" alt="Driver or Rider"/>
+  <img src="ss_driver_reg.jpeg" width="32%" alt="Driver Registration"/>
+  <img src="ss_vehicle.jpeg" width="32%" alt="Add Vehicle"/>
+</p>
+
+> *Choose your role · Register driving licence · Add vehicle details*
+
+<p align="center">
+  <img src="ss_create_trip.jpeg" width="32%" alt="Create Trip"/>
+  <img src="ss_driveshare_results.jpeg" width="32%" alt="DriveShare Results"/>
+  <img src="ss_mytrips.jpeg" width="32%" alt="My Trips"/>
+</p>
+
+> *Create trip with Pink Mode toggle · Browse carpool rides · Manage your trips*
+
+---
+
+### 🩷 Pink Mode
+One tap. Women only.
+
+- Filter both FareShare and DriveShare to show only **female co-passengers and female drivers**
+- Based on gender collected at signup — no manual tagging
+- Available independently in both features
+- Because safety isn't optional. It's a feature.
+
+---
+
+### 🤖 Sawaari AI — The Agentic Chatbot
+The crown jewel. **Just talk to Sawaari.**
+
+No forms. No dropdowns. No English required.
+
+A floating AI assistant lives on every page. Tap it and just speak — in Tamil, Telugu, Malayalam, Hindi, or English. Sawaari AI understands your intent and does everything for you.
+
+```
+"நாளைக்கு காலையில் உக்கடம்லருந்து கோயம்புத்தூர் ஜங்ஷன் போக யாராவது இருக்காங்களா?"
+"రేపు పొద్దున్నే హైదరాబాద్ నుండి సికింద్రాబాద్ వెళ్ళే వాళ్ళు ఎవరైనా ఉన్నారా?"
+```
+
+Sawaari hears it. Understands it. Finds the ride. Done.
+
+**What Sawaari AI can do:**
+- 🔍 Search rides by just describing where you want to go
+- 📝 Register a ride conversationally — no form filling
+- 🤝 Request to join a ride on your behalf
+- ❓ Answer any question about how Sawaari works
+- 🆘 **Trigger SOS instantly** if it detects distress in any language
+
+---
+
+### 🆘 SOS Emergency System
+Your safety net during every ride.
+
+- Red floating SOS button visible on every active ride page
+- **5-second countdown** with cancel option to prevent accidents
+- On trigger: captures live GPS coordinates and sends an alert with:
+  - Your current location + Google Maps link
+  - Vehicle registration number
+  - All co-passenger names
+  - Ride source and destination
+- Alert goes to your **emergency contact** + nearest police station
+- **Voice SOS** — if you say *உதவி / సహాయం / സഹായം / मदद / help* to Sawaari AI, SOS triggers **instantly with zero countdown**
+
+---
+
+### 🔐 Identity & Trust System
+
+<p align="center">
+  <img src="ss_home.jpeg" width="60%" alt="Home — Verified Profile with Badges"/>
+</p>
+
+> *Aadhaar Verified ✓ · New to Sawaari 🌱 · Emergency Contact · Trip count — all visible at a glance*
+
+**Aadhaar Verification (Verhoeff Checksum)**
+- Every user verifies their Aadhaar number at signup
+- Uses UIDAI's official Verhoeff checksum algorithm to validate number authenticity
+- Masked storage — only last 4 digits stored (XXXX-XXXX-4521)
+- No one can join or create a ride without being Aadhaar verified
+
+**Mutual Acceptance Model**
+- Nobody auto-joins any ride
+- Join requests show the requester's full profile to the ride owner
+- Ride owner explicitly accepts or declines every request
+- Passengers can view all existing members' profiles before requesting
+
+**User Profiles & Reputation**
+- ⭐ Star rating averaged across all completed rides
+- Total trip count displayed on every profile
+- 🌱 *New to Sawaari* badge for users with fewer than 3 trips
+- ✓ *Verified Traveller* badge after 10+ trips
+- *Aadhaar Verified* badge always shown
+
+---
+
+### 📍 Live GPS Tracking
+
+- Ride owner confirms trip start at scheduled time
+- Real-time GPS tracking begins via browser Geolocation API
+- Live map powered by **Leaflet.js + OpenStreetMap** (no API key needed)
+- All ride members see the live location on map
+- **Shareable tracking link** — anyone with the link can view live location without an account (perfect for sharing with family)
+- Tracking auto-stops after ride completion or 3 hours post-scheduled time
+
+---
+
+### 💬 Group Chat
+When a ride has 2+ members a group chat automatically opens.
+
+- Real-time messaging via **Socket.io**
+- WhatsApp-style bubble UI
+- Phone numbers **never shared** — all communication stays in-app
+- Call button available — connects users without exposing numbers
+
+---
+
+### 🚘 Ride Audit Log
+Every started ride creates a permanent tamper-proof record:
+
+- All passenger Aadhaar numbers (masked)
+- Vehicle registration number
+- Timestamp, source, destination
+- All member IDs
+
+This log is **never deletable** — creating accountability for every journey.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React + TailwindCSS |
+| Backend | Node.js + Express |
+| Database | SQLite |
+| Real-time | Socket.io |
+| Authentication | JWT + Aadhaar OTP (simulated) |
+| Maps | Leaflet.js + OpenStreetMap |
+| Location Search | Nominatim OpenStreetMap API |
+| GPS Tracking | Browser Geolocation API |
+| AI Brain | Groq API (llama-3.3-70b-versatile) |
+| Voice Input | Azure AI Speech Service |
+| Aadhaar Validation | Verhoeff Checksum Algorithm |
+
+---
+
+## 🗣️ Supported Languages
+
+| Language | Voice Input | AI Reply |
+|----------|------------|----------|
+| English | ✅ | ✅ |
+| தமிழ் (Tamil) | ✅ | ✅ |
+| తెలుగు (Telugu) | ✅ | ✅ |
+| മലയാളം (Malayalam) | ✅ | ✅ |
+| हिन्दी (Hindi) | ✅ | ✅ |
+
+---
+
+## 👤 User Workflow
+
+### New User Signup
+```
+Enter Phone Number
+      ↓
+Enter Aadhaar Number
+      ↓
+OTP Verification (Verhoeff validated)
+      ↓
+Enter Username + Gender + Age (15+ only)
+      ↓
+Set Emergency Contact (mandatory)
+      ↓
+Home → FareShare / DriveShare
+```
+
+<p align="center">
+  <img src="ss_login.jpeg" width="24%" alt="Step 1 - Phone"/>
+  <img src="ss_aadhaar.jpeg" width="24%" alt="Step 2 - Aadhaar"/>
+  <img src="ss_profile.jpeg" width="24%" alt="Step 3 - Profile"/>
+  <img src="ss_home.jpeg" width="24%" alt="Step 4 - Home"/>
+</p>
+
+### Finding a Ride (App)
+```
+Open FareShare
+      ↓
+Type Source + Destination (autocomplete)
+      ↓
+Pick Date + Time
+      ↓
+Enter passenger count (male/female)
+      ↓
+Search → View overlapping rides
+      ↓
+View ride owner + member profiles
+      ↓
+Request to Join → Owner accepts/declines
+      ↓
+Group chat opens automatically
+```
+
+### Finding a Ride (Sawaari AI)
+```
+Tap floating AI button
+      ↓
+Speak in your language 🎙️
+      ↓
+Azure Speech transcribes → Groq understands
+      ↓
+Ride cards appear inside chat
+      ↓
+Tap "Request to Join" — done
+```
+
+### Starting a Ride
+```
+Scheduled time arrives → Popup appears
+      ↓
+"Has your trip started?" → Click Yes
+      ↓
+Enter vehicle registration number
+      ↓
+GPS tracking begins
+      ↓
+Share live tracking link with family
+      ↓
+Ride complete → Rate all co-passengers
+```
+
+---
+
+## 🗃️ Database Schema
+
+```
+users
+├── id, phone, username, gender, age
+├── aadhaar_last4, aadhaar_verified
+├── emergency_contact_name, emergency_contact_phone
+└── trip_count, avg_rating
+
+rides
+├── id, user_id, source, destination
+├── source_lat, source_lng
+├── destination_lat, destination_lng
+├── date, time, vehicle_type, seats_available
+├── male_count, female_count
+└── expires_at, vehicle_reg, status
+
+ride_members
+└── id, ride_id, user_id, joined_at
+
+ride_requests
+└── id, ride_id, requester_id, status, requested_at
+
+ride_tracking
+└── id, ride_id, lat, lng, timestamp
+
+ride_audit_log
+└── id, ride_id, started_at, source, destination,
+    vehicle_reg, member_aadhaars (JSON), member_ids (JSON)
+
+messages
+└── id, ride_id, user_id, content, sent_at
+
+ratings
+└── id, ride_id, rated_by, rated_user, stars, created_at
+```
+
+---
+
+## ⚙️ Environment Variables
+
+```env
+GROQ_API_KEY=gsk_...
+AZURE_SPEECH_KEY=...
+AZURE_SPEECH_REGION=centralindia
+JWT_SECRET=<generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))">
+```
+
+---
+
+## 🚦 Getting Started
+
 ```bash
-cd backend
+# Clone the repository
+git clone https://github.com/satwii/Shinchan-s-Sawaari.git
+cd sawaari
+
+# Install dependencies
 npm install
-```
 
-**Frontend:**
-```bash
-cd frontend
-npm install
-```
+# Set up environment variables
+cp .env.example .env
+# Fill in your API keys in .env
 
-### 2. Start the Backend
-```bash
-cd backend
-node server.js
+# Start the development server
+npm run dev
 ```
-Backend runs on `http://localhost:5000`
-
-### 3. Start the Frontend (in a new terminal)
-```bash
-cd frontend
-npm start
-```
-Frontend runs on `http://localhost:3000`
 
 ---
 
-## 🔐 How OTP Works (Dev Mode)
+## 🔒 Safety Philosophy
 
-OTPs are printed in the **backend terminal console** — check the server terminal when logging in. Look for:
-```
-📲 [SAWAARI OTP SERVICE]
-   Phone : +91...
-   OTP   : 123456
-```
+> Sawaari doesn't connect strangers. It connects **verified, rated, mutually consenting co-travellers** — with live tracking, instant SOS in five languages, and zero personal data exposure.
 
-To use real SMS (e.g. Twilio), replace the `sendOtp()` function body in `backend/routes/auth.js`.
+Every safety layer works together:
+- **Before the ride** — Aadhaar verification + profile + ratings
+- **Choosing co-passengers** — mutual acceptance, nobody forced
+- **During the ride** — live GPS tracking + shareable link + SOS
+- **After the ride** — audit log + mutual ratings
 
----
-
-## 📱 Features
-
-| Feature | Status |
-|---------|--------|
-| Phone + OTP Auth (real verification) | ✅ |
-| JWT Session (7-day tokens) | ✅ |
-| Signup with age gate (< 15 blocked) | ✅ |
-| Ride Search with Route Overlap Matching | ✅ |
-| Pink Mode (female-only filter) | ✅ |
-| Register a Ride | ✅ |
-| Join a Ride | ✅ |
-| Auto-expiry of past rides | ✅ |
-| Real-time Group Chat (Socket.io) | ✅ |
-| WhatsApp-style Chat UI | ✅ |
-| Call stub (no phone numbers shared) | ✅ |
-| Carpooling | 🚧 Coming Soon |
+Safer than giving a lift to a random stranger on the road — because you know exactly who they are before you ever meet them.
 
 ---
 
-## 🗄️ Database
+## 👥 Team
 
-SQLite database auto-created at `backend/sawaari.db` on first run.
-
-Tables: `users`, `otp_store`, `rides`, `ride_members`, `messages`
+Built with ❤️ for India 
 
 ---
 
-## 🔒 Security
-
-- Phone numbers are **never** exposed in any API response or UI
-- JWT validated on every protected route
-- OTPs expire in 10 minutes and can only be used once
-- Age validation: users under 15 cannot register
+*"The best ride isn't the cheapest one on the app. It's the one where you only pay for the seat you actually use — and you found it just by asking."*
