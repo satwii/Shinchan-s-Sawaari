@@ -83,6 +83,35 @@ router.post('/check-phone', (req, res) => {
     }
 });
 
+// ─── POST /api/auth/send-login-otp ───────────────────────────────────────────
+// For returning verified users — send OTP directly without Aadhaar
+router.post('/send-login-otp', (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) return res.status(400).json({ error: 'Phone number is required' });
+
+        const db = getDb();
+        const existingUser = db.prepare(`SELECT id, username, aadhaar_verified FROM users WHERE phone = ?`).get(phone);
+        if (!existingUser || !existingUser.aadhaar_verified) {
+            return res.status(400).json({ error: 'User not found or not verified. Please use full signup.' });
+        }
+
+        const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
+        db.prepare(`UPDATE otp_store SET used = 1 WHERE phone = ? AND used = 0`).run(phone);
+        db.prepare(`INSERT INTO otp_store (phone, otp, expires_at) VALUES (?, ?, ?)`).run(phone, DEMO_OTP, expiresAt);
+
+        console.log(`\n📲 [LOGIN OTP]`);
+        console.log(`   Phone : ${phone}`);
+        console.log(`   OTP   : ${DEMO_OTP}`);
+        console.log(`   Valid for ${OTP_EXPIRY_MINUTES} minutes\n`);
+
+        res.json({ success: true, message: 'OTP sent to your registered phone number' });
+    } catch (err) {
+        console.error('Send login OTP error:', err);
+        res.status(500).json({ error: 'Failed to send OTP' });
+    }
+});
+
 // ─── POST /api/auth/send-aadhaar-otp ─────────────────────────────────────────
 // Step 2-3: Send OTP for Aadhaar verification (hardcoded 123456)
 router.post('/send-aadhaar-otp', (req, res) => {
@@ -251,12 +280,27 @@ router.post('/register', (req, res) => {
         db.prepare(`UPDATE otp_store SET used = 1 WHERE id = ?`).run(otpRecord.id);
 
         const newUser = db.prepare(`SELECT * FROM users WHERE id = ?`).get(existingUser.id);
-        const token = makeToken(newUser);
+
+        // ── ₩1000 Welcome Bonus ───────────────────────────────────────────────
+        try {
+            const currentWallet = newUser.sawaari_wallet || 0;
+            const bonusBalance = currentWallet + 1000;
+            db.prepare(`UPDATE users SET sawaari_wallet = ? WHERE id = ?`).run(bonusBalance, newUser.id);
+            db.prepare(`
+                INSERT INTO wallet_transactions (user_id, type, amount, balance_after, description)
+                VALUES (?, 'welcome_bonus', 1000, ?, 'Welcome to Sawaari! ₩1000 bonus added to your wallet 🎉')
+            `).run(newUser.id, bonusBalance);
+        } catch (walletErr) {
+            console.error('Welcome bonus error (non-fatal):', walletErr);
+        }
+
+        const finalUser = db.prepare(`SELECT * FROM users WHERE id = ?`).get(existingUser.id);
+        const token = makeToken(finalUser);
 
         res.status(201).json({
             success: true,
             token,
-            user: userPayload(newUser),
+            user: userPayload(finalUser),
         });
     } catch (err) {
         console.error('Register error:', err);
@@ -280,13 +324,35 @@ router.post('/set-driveshare-role', authenticateToken, (req, res) => {
 
         const db = getDb();
         const userId = req.user.userId;
-        const user = db.prepare(`SELECT id, role FROM users WHERE id = ?`).get(userId);
+        const user = db.prepare(`SELECT * FROM users WHERE id = ?`).get(userId);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        if (user.role) {
-            return res.status(400).json({ error: `You are already registered as a ${user.role}` });
+        // ── If already registered with the SAME role → just return success with fresh token
+        if (user.role === role) {
+            const token = makeToken(user);
+            return res.json({
+                success: true, token,
+                user: userPayload(user),
+                alreadyRegistered: true,
+                message: `Welcome back! You are already registered as a ${role}.`,
+            });
         }
 
+        // ── If registered with a DIFFERENT role → don't allow switching silently
+        if (user.role && user.role !== role) {
+            // Still succeed — just keep their existing role and return a token
+            // This handles the edge case of a driver trying to go through rider flow
+            const token = makeToken(user);
+            return res.json({
+                success: true, token,
+                user: userPayload(user),
+                alreadyRegistered: true,
+                existingRole: user.role,
+                message: `You are registered as a ${user.role}. Redirecting accordingly.`,
+            });
+        }
+
+        // ── Fresh registration
         db.prepare(`UPDATE users SET role = ? WHERE id = ?`).run(role, userId);
 
         if (role === 'driver') {
@@ -302,6 +368,7 @@ router.post('/set-driveshare-role', authenticateToken, (req, res) => {
         res.json({
             success: true, token,
             user: userPayload(updatedUser),
+            alreadyRegistered: false,
             message: `You are now registered as a ${role} on DriveShare!`,
         });
     } catch (err) {

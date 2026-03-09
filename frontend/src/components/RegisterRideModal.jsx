@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import LocationAutocomplete from './LocationAutocomplete';
+import FareCard from './FareCard';
 
 export default function RegisterRideModal({ isOpen, onClose, onRegistered }) {
     const { user } = useAuth();
@@ -23,6 +24,7 @@ export default function RegisterRideModal({ isOpen, onClose, onRegistered }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [step, setStep] = useState(1);
+    const [calculatedFare, setCalculatedFare] = useState(null);
 
     if (!isOpen) return null;
 
@@ -67,6 +69,7 @@ export default function RegisterRideModal({ isOpen, onClose, onRegistered }) {
                 sourceLng: form.sourceLng,
                 destinationLat: form.destinationLat,
                 destinationLng: form.destinationLng,
+                calculatedFare: calculatedFare,
             });
 
             onRegistered?.(res.data.ride);
@@ -200,6 +203,17 @@ export default function RegisterRideModal({ isOpen, onClose, onRegistered }) {
                                         className="w-9 h-9 rounded-lg bg-sawaari-border text-white font-bold text-lg flex items-center justify-center hover:bg-sawaari-card transition-colors">+</button>
                                 </div>
                             </div>
+
+                            {/* Sawaari Fare Card */}
+                            <FareCard
+                                sourceLat={form.sourceLat}
+                                sourceLng={form.sourceLng}
+                                destLat={form.destinationLat}
+                                destLng={form.destinationLng}
+                                vehicleType={form.vehicleType}
+                                seats={form.seatsAvailable}
+                                onFareReady={setCalculatedFare}
+                            />
 
                             {/* Passenger counts */}
                             <div className="grid grid-cols-2 gap-3">

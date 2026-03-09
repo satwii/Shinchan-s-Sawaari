@@ -1,0 +1,267 @@
+﻿================================================
+   SAWAARI - COMPLETE FEATURE TEST SUITE
+================================================
+
+[SECTION 1] HEALTH CHECK
+
+--- TEST: Backend Health Check ---
+  PASS (200)
+  {"status":"ok","service":"Sawaari Backend","timestamp":"2026-02-19T11:30:59.589Z"}
+
+
+[SECTION 2] SIGNUP FLOW - User A (Male, Ride Owner)
+
+--- TEST: Step 1: Check Phone ---
+  PASS (200)
+  {"success":true,"isExistingUser":false,"isVerified":false,"phone":"5551112222"}
+
+--- TEST: Step 2: Send Aadhaar OTP ---
+  PASS (200)
+  {"success":true,"message":"OTP sent to Aadhaar-linked mobile number","aadhaarLast4":"3333"}
+
+--- TEST: Step 3: Verify OTP ---
+  PASS (200)
+  {"success":true,"isLogin":false,"otpVerified":true,"needsRegistration":true,"phone":"5551112222"}
+
+--- TEST: Step 4-5: Register User A ---
+  PASS (201)
+  {"success":true,"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUsInVzZXJuYW1lIjoiVGVzdE93bmVyWCIsImdlbmRlciI6Ik1hbGUiLCJyb2xlIjpudWxsLCJpYXQiOjE3NzE1MDA2NTksImV4cCI6MTc3MjEwNTQ1OX0.pBew_R871RukHbrnwN1eu8L0zNVtaPDgQJXlVT_NU8c","user":{"id":5,"username":"TestOwnerX","gender":"Male","age":...
+  >> Token A: OK
+
+[SECTION 3] SIGNUP FLOW - User B (Female, Joiner)
+
+--- TEST: Step 1: Check Phone ---
+  PASS (200)
+  {"success":true,"isExistingUser":false,"isVerified":false,"phone":"5553334444"}
+
+--- TEST: Step 2: Send Aadhaar OTP ---
+  PASS (200)
+  {"success":true,"message":"OTP sent to Aadhaar-linked mobile number","aadhaarLast4":"6666"}
+
+--- TEST: Step 3: Verify OTP ---
+  PASS (200)
+  {"success":true,"isLogin":false,"otpVerified":true,"needsRegistration":true,"phone":"5553334444"}
+
+--- TEST: Step 4-5: Register User B ---
+  PASS (201)
+  {"success":true,"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjYsInVzZXJuYW1lIjoiVGVzdEpvaW5lclkiLCJnZW5kZXIiOiJGZW1hbGUiLCJyb2xlIjpudWxsLCJpYXQiOjE3NzE1MDA2NTksImV4cCI6MTc3MjEwNTQ1OX0.kXL3KzTpPnSpN9YB786mSDHR-lBS63RgZ3SGB8rXXmI","user":{"id":6,"username":"TestJoinerY","gender":"Female"...
+  >> Token B: OK
+
+[SECTION 4] PROFILE RETRIEVAL + BADGES
+
+--- TEST: Get Profile A ---
+  PASS (200)
+  {"user":{"id":5,"username":"TestOwnerX","gender":"Male","age":28,"role":null,"aadhaar_verified":true,"emergency_contact_name":"Mom","emergency_contact_phone":"9111111111","trip_count":0,"created_at":"2026-02-19 11:30:59","avg_rating":null,"rating_count":0,"badges":["Aadhaar Verified Γ£ô","New to Sawaa...
+
+--- TEST: Get Profile B ---
+  PASS (200)
+  {"user":{"id":6,"username":"TestJoinerY","gender":"Female","age":24,"role":null,"aadhaar_verified":true,"emergency_contact_name":"Dad","emergency_contact_phone":"9222222222","trip_count":0,"created_at":"2026-02-19 11:30:59","avg_rating":null,"rating_count":0,"badges":["Aadhaar Verified Γ£ô","New to Sa...
+
+[SECTION 5] RIDE REGISTRATION
+
+--- TEST: Register Ride (Owner A) ---
+  PASS (201)
+  {"success":true,"ride":{"id":6,"user_id":5,"source":"Ameerpet","destination":"HITEC City","date":"2026-02-20","time_slot":"Morning","ride_time":"09:30","vehicle_type":"Cab","seats_available":4,"male_count":1,"female_count":0,"pink_mode":0,"status":"open","trip_started":0,"trip_started_at":null,"trip...
+  >> Ride ID: 6
+
+[SECTION 6] RIDE SEARCH
+
+--- TEST: Search Rides (User B) ---
+  PASS (200)
+  {"rides":[{"id":6,"source":"Ameerpet","destination":"HITEC City","date":"2026-02-20","time_slot":"Morning","ride_time":"09:30","vehicle_type":"Cab","seats_available":4,"male_count":1,"female_count":0,"pink_mode":0,"created_at":"2026-02-19 11:30:59","expires_at":"2026-02-20T09:30:00.000Z","status":"o...
+  >> Found 1 ride(s)
+
+[SECTION 7] RIDE DETAIL VIEW
+
+--- TEST: View Ride as Owner ---
+  PASS (200)
+  {"ride":{"id":6,"user_id":5,"source":"Ameerpet","destination":"HITEC City","date":"2026-02-20","time_slot":"Morning","ride_time":"09:30","vehicle_type":"Cab","seats_available":4,"male_count":1,"female_count":0,"pink_mode":0,"status":"open","trip_started":0,"trip_started_at":null,"trip_completed":0,"...
+status service         timestamp               
+------ -------         ---------               
+ok     Sawaari Backend 2026-02-19T11:30:59.589Z
+                                               
+                                               
+                                               
+                                               
+                                               
+
+--- TEST: View Ride as Outsider ---
+  PASS (200)
+  {"ride":{"id":6,"user_id":5,"source":"Ameerpet","destination":"HITEC City","date":"2026-02-20","time_slot":"Morning","ride_time":"09:30","vehicle_type":"Cab","seats_available":4,"male_count":1,"female_count":0,"pink_mode":0,"status":"open","trip_started":0,"trip_started_at":null,"trip_completed":0,"...
+                                               
+
+[SECTION 8] RIDE REQUEST + ACCEPTANCE
+
+--- TEST: B sends Join Request ---
+  PASS (200)
+  {"success":true,"message":"Request sent! Waiting for ride owner approval.","status":"pending"}
+
+--- TEST: Owner A views Pending Requests ---
+  PASS (200)
+  {"requests":[{"id":4,"requester_id":6,"status":"pending","requested_at":"2026-02-19 11:31:00","username":"TestJoinerY","gender":"Female","aadhaar_verified":1,"trip_count":0,"profile":{"id":6,"username":"TestJoinerY","gender":"Female","aadhaar_verified":true,"trip_count":0,"avg_rating":null,"rating_c...
+
+--- TEST: Owner A Accepts Request ---
+  PASS (200)
+  {"success":true,"message":"Request accepted!","member_count":2}
+                                               
+
+--- TEST: Verify B is now a Member ---
+  PASS (200)
+  {"members":[{"id":5,"username":"TestOwnerX","gender":"Male","age":28,"aadhaar_verified":1,"trip_count":0,"joined_at":"2026-02-19 11:30:59","profile":{"id":5,"username":"TestOwnerX","gender":"Male","aadhaar_verified":true,"trip_count":0,"avg_rating":null,"rating_count":0,"badges":["Aadhaar Verified Γ£ô...
+  >> Members: TestOwnerX, TestJoinerY
+
+[SECTION 9] MY RIDES
+
+--- TEST: My Rides (Owner A) ---
+  PASS (200)
+  {"rides":[{"id":6,"source":"Ameerpet","destination":"HITEC City","date":"2026-02-20","time_slot":"Morning","ride_time":"09:30","vehicle_type":"Cab","seats_available":4,"male_count":1,"female_count":0,"pink_mode":0,"expires_at":"2026-02-20T09:30:00.000Z","status":"open","trip_started":0,"trip_started...
+                                               
+
+--- TEST: My Rides (Joiner B) ---
+  PASS (200)
+  {"rides":[{"id":6,"source":"Ameerpet","destination":"HITEC City","date":"2026-02-20","time_slot":"Morning","ride_time":"09:30","vehicle_type":"Cab","seats_available":4,"male_count":1,"female_count":0,"pink_mode":0,"expires_at":"2026-02-20T09:30:00.000Z","status":"open","trip_started":0,"trip_started...
+                                               
+
+[SECTION 10] VEHICLE REG + TRIP START
+
+--- TEST: Start Trip ---
+  PASS (200)
+  {"success":true,"message":"Trip started!","tracking_token":"c5c45e54-70ab-4353-a665-66279ece0b02"}
+
+--- TEST: Verify trip_started=true ---
+  PASS (200)
+  {"ride":{"id":6,"user_id":5,"source":"Ameerpet","destination":"HITEC City","date":"2026-02-20","time_slot":"Morning","ride_time":"09:30","vehicle_type":"Cab","seats_available":4,"male_count":1,"female_count":0,"pink_mode":0,"status":"active","trip_started":1,"trip_started_at":"2026-02-19T11:31:00.26...
+  >> Trip is ACTIVE
+
+[SECTION 11] GPS LIVE TRACKING
+
+--- TEST: Owner sends GPS loc 1 ---
+  PASS (200)
+  {"success":true}
+                                               
+
+--- TEST: Member B gets tracking ---
+  PASS (200)
+  {"latest":{"lat":17.4399,"lng":78.4983,"timestamp":"2026-02-19 11:31:00"},"history":[{"lat":17.4399,"lng":78.4983,"timestamp":"2026-02-19 11:31:00"}]}
+  >> Lat: 17.4399, Lng: 78.4983
+
+--- TEST: Owner sends GPS loc 2 (movement) ---
+  PASS (200)
+  {"success":true}
+                                               
+
+--- TEST: Member B sees updated position ---
+  PASS (200)
+  {"latest":{"lat":17.4399,"lng":78.4983,"timestamp":"2026-02-19 11:31:00"},"history":[{"lat":17.4399,"lng":78.4983,"timestamp":"2026-02-19 11:31:00"},{"lat":17.445,"lng":78.501,"timestamp":"2026-02-19 11:31:00"}]}
+  >> Updated - Lat: 17.4399, Lng: 78.4983
+
+[SECTION 12] PUBLIC TRACKING LINK
+  >> Tracking Token: c5c45e54-70ab-4353-a665-66279ece0b02
+
+--- TEST: Public Track (NO auth!) ---
+  PASS (200)
+  {"ride":{"source":"Ameerpet","destination":"HITEC City","date":"2026-02-20","ride_time":"09:30","vehicle_type":"Cab","trip_started":true,"trip_completed":false,"vehicle_reg":"TN 11 AB 1234","owner_username":"TestOwnerX"},"latest":{"lat":17.4399,"lng":78.4983,"timestamp":"2026-02-19 11:31:00"},"histo...
+  >> Route: Ameerpet -> HITEC City
+  >> Owner: TestOwnerX
+  >> Vehicle: TN 11 AB 1234
+
+[SECTION 13] CHAT MESSAGES
+
+--- TEST: Get Chat Messages (Owner A) ---
+  PASS (200)
+  {"messages":[]}
+                                               
+
+--- TEST: Get Chat Messages (Member B) ---
+  PASS (200)
+  {"messages":[]}
+                                               
+
+[SECTION 14] SOS EMERGENCY DATA
+
+--- TEST: SOS Data (Owner A) ---
+  PASS (200)
+  {"userName":"TestOwnerX","emergencyContact":{"name":"Mom","phone":"9111111111"},"vehicleReg":"TN 11 AB 1234","coPassengers":["TestJoinerY"],"source":"Ameerpet","destination":"HITEC City"}
+  >> Emergency: Mom - 9111111111
+  >> Vehicle: TN 11 AB 1234
+  >> Route: Ameerpet -> HITEC City
+
+--- TEST: SOS Data (Joiner B) ---
+  PASS (200)
+  {"userName":"TestJoinerY","emergencyContact":{"name":"Dad","phone":"9222222222"},"vehicleReg":"TN 11 AB 1234","coPassengers":["TestOwnerX"],"source":"Ameerpet","destination":"HITEC City"}
+  >> CoPassengers: TestOwnerX
+
+[SECTION 15] TRIP COMPLETION
+
+--- TEST: Complete Trip ---
+  PASS (200)
+  {"success":true,"message":"Trip completed!"}
+                                               
+
+--- TEST: Verify trip_completed=true ---
+  PASS (200)
+  {"ride":{"id":6,"user_id":5,"source":"Ameerpet","destination":"HITEC City","date":"2026-02-20","time_slot":"Morning","ride_time":"09:30","vehicle_type":"Cab","seats_available":4,"male_count":1,"female_count":0,"pink_mode":0,"status":"completed","trip_started":1,"trip_started_at":"2026-02-19T11:31:00...
+  >> Trip is COMPLETED
+
+[SECTION 16] RATING SYSTEM
+
+--- TEST: Check unrated users (A) ---
+  PASS (200)
+  {"ratedUserIds":[]}
+                                               
+
+--- TEST: Get Members for Rating ---
+  PASS (200)
+  {"members":[{"id":5,"username":"TestOwnerX","gender":"Male","age":28,"aadhaar_verified":1,"trip_count":1,"joined_at":"2026-02-19 11:30:59","profile":{"id":5,"username":"TestOwnerX","gender":"Male","aadhaar_verified":true,"trip_count":1,"avg_rating":null,"rating_count":0,"badges":["Aadhaar Verified Γ£ô...
+
+--- TEST: A rates B: 5 stars ---
+  PASS (200)
+  {"success":true,"message":"Ratings submitted!"}
+                                               
+
+--- TEST: B rates A: 4 stars ---
+  PASS (200)
+  {"success":true,"message":"Ratings submitted!"}
+                                               
+
+--- TEST: Profile A after rating ---
+  PASS (200)
+  {"user":{"id":5,"username":"TestOwnerX","gender":"Male","age":28,"role":null,"aadhaar_verified":true,"emergency_contact_name":"Mom","emergency_contact_phone":"9111111111","trip_count":1,"created_at":"2026-02-19 11:30:59","avg_rating":4,"rating_count":1,"badges":["Aadhaar Verified Γ£ô","New to Sawaari ...
+  >> Trip count: 1
+
+[SECTION 17] EMERGENCY CONTACT UPDATE
+
+--- TEST: Update Emergency Contact ---
+  PASS (200)
+  {"success":true,"message":"Emergency contact updated"}
+                                               
+
+--- TEST: Verify Updated Contact ---
+  PASS (200)
+  {"user":{"id":5,"username":"TestOwnerX","gender":"Male","age":28,"role":null,"aadhaar_verified":true,"emergency_contact_name":"Updated Mom","emergency_contact_phone":"9333333333","trip_count":1,"created_at":"2026-02-19 11:30:59","avg_rating":4,"rating_count":1,"badges":["Aadhaar Verified Γ£ô","New to ...
+  >> Emergency contact updated OK!
+
+[SECTION 18] PINK MODE
+
+--- TEST: Female B registers Pink Mode Ride ---
+  PASS (201)
+  {"success":true,"ride":{"id":7,"user_id":6,"source":"Kukatpally","destination":"Gachibowli","date":"2026-02-20","time_slot":"Afternoon","ride_time":"14:00","vehicle_type":"Auto","seats_available":3,"male_count":0,"female_count":1,"pink_mode":1,"status":"open","trip_started":0,"trip_started_at":null,...
+
+--- TEST: Male A normal search (pink rides hidden) ---
+  PASS (200)
+  {"rides":[]}
+  >> Pink Mode filtering OK: Male sees 0 pink rides
+
+--- TEST: Female B search (should see pink rides) ---
+  PASS (200)
+  {"rides":[{"id":3,"source":"Kukatpally","destination":"Gachibowli","date":"2026-02-20","time_slot":"Afternoon","ride_time":"14:00","vehicle_type":"Auto","seats_available":3,"male_count":0,"female_count":1,"pink_mode":1,"created_at":"2026-02-19 11:27:11","expires_at":"2026-02-20T14:00:00.000Z","statu...
+
+================================================
+   TEST SUITE COMPLETE
+================================================
+  PASSED : 44
+  FAILED : 0
+  SKIPPED: 0
+================================================
+
+

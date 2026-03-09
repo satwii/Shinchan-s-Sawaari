@@ -5,6 +5,7 @@ import api from '../api';
 import RideCard from '../components/RideCard';
 import RegisterRideModal from '../components/RegisterRideModal';
 import LocationAutocomplete from '../components/LocationAutocomplete';
+import NotificationBell from '../components/NotificationBell';
 
 export default function FairSharePage() {
     const { user } = useAuth();
@@ -83,8 +84,9 @@ export default function FairSharePage() {
     }
 
     function handleRegistered(ride) {
-        setMsg('Ride registered! 🚗');
+        setMsg('Ride registered! 🚗 Switching to My Rides...');
         fetchMyRides();
+        setActiveTab('myrides');
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -101,10 +103,13 @@ export default function FairSharePage() {
                             <p className="text-sawaari-muted text-xs">Share rides, split costs</p>
                         </div>
                     </div>
-                    <button onClick={() => setShowModal(true)}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white text-sm font-semibold shadow-lg shadow-primary-500/20 hover:from-primary-600 hover:to-primary-700 active:scale-95 transition-all">
-                        + New Ride
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <NotificationBell />
+                        <button onClick={() => setShowModal(true)}
+                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white text-sm font-semibold shadow-lg shadow-primary-500/20 hover:from-primary-600 hover:to-primary-700 active:scale-95 transition-all">
+                            + New Ride
+                        </button>
+                    </div>
                 </div>
 
                 {/* Tabs */}

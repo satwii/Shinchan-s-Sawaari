@@ -197,6 +197,29 @@ function initSchema() {
         created_at  TEXT    DEFAULT (datetime('now')),
         UNIQUE(ride_id, rated_by, rated_user)
     );
+
+    -- ─── NOTIFICATIONS ────────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS notifications (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL REFERENCES users(id),
+        type        TEXT    NOT NULL,
+        message     TEXT    NOT NULL,
+        ride_id     INTEGER,
+        is_read     INTEGER DEFAULT 0,
+        created_at  TEXT    DEFAULT (datetime('now'))
+    );
+
+    -- ─── WALLET TRANSACTIONS ────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS wallet_transactions (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id         INTEGER NOT NULL REFERENCES users(id),
+        type            TEXT    NOT NULL,
+        amount          REAL    NOT NULL,
+        balance_after   REAL    NOT NULL,
+        description     TEXT,
+        ride_id         INTEGER,
+        created_at      TEXT    DEFAULT (datetime('now'))
+    );
   `);
 
     // ─── MIGRATIONS for existing tables ──────────────────────────────────────
@@ -206,6 +229,7 @@ function initSchema() {
         { table: 'users', column: 'emergency_contact_name', type: 'TEXT' },
         { table: 'users', column: 'emergency_contact_phone', type: 'TEXT' },
         { table: 'users', column: 'trip_count', type: 'INTEGER DEFAULT 0' },
+        { table: 'users', column: 'sawaari_wallet', type: 'REAL DEFAULT 1000' },
         { table: 'rides', column: 'ride_time', type: 'TEXT' },
         { table: 'rides', column: 'status', type: "TEXT DEFAULT 'open'" },
         { table: 'rides', column: 'trip_started', type: 'INTEGER DEFAULT 0' },
@@ -218,6 +242,10 @@ function initSchema() {
         { table: 'rides', column: 'source_lng', type: 'REAL' },
         { table: 'rides', column: 'destination_lat', type: 'REAL' },
         { table: 'rides', column: 'destination_lng', type: 'REAL' },
+        { table: 'rides', column: 'calculated_fare', type: 'REAL' },
+        { table: 'rides', column: 'cancelled_at', type: 'TEXT' },
+        { table: 'rides', column: 'cancellation_reason', type: 'TEXT' },
+        { table: 'trips', column: 'calculated_fare', type: 'REAL' },
     ];
 
     for (const m of migrations) {

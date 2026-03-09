@@ -12,14 +12,20 @@ const STEPS = {
 };
 
 const STEP_LABELS = ['Phone', 'Aadhaar', 'Verify', 'Profile', 'Emergency'];
+const LOGIN_STEP_LABELS = ['Phone', 'Verify'];
 
 function ProgressBar({ currentStep, isLogin }) {
-    const steps = isLogin ? ['Phone', 'Aadhaar', 'Verify'] : STEP_LABELS;
+    // For login: step 0 = Phone, step 1 = Verify (OTP)
+    // Map auth steps to display steps for login
+    const displayStep = isLogin
+        ? (currentStep === STEPS.OTP ? 1 : 0)
+        : currentStep;
+    const steps = isLogin ? LOGIN_STEP_LABELS : STEP_LABELS;
     return (
         <div className="flex items-center justify-center gap-1 mb-6">
             {steps.map((label, i) => {
-                const isActive = i === currentStep;
-                const isDone = i < currentStep;
+                const isActive = i === displayStep;
+                const isDone = i < displayStep;
                 return (
                     <div key={label} className="flex items-center gap-1">
                         <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all duration-300
@@ -121,7 +127,18 @@ export default function AuthPage() {
         try {
             const res = await api.post('/auth/check-phone', { phone: `+91${normalized}` });
             setIsExistingUser(res.data.isExistingUser);
-            setStep(STEPS.AADHAAR);
+            if (res.data.isExistingUser) {
+                // Existing verified user — skip Aadhaar, send OTP directly
+                const otpRes = await api.post('/auth/send-login-otp', { phone: `+91${normalized}` });
+                if (otpRes.data.success) {
+                    setStep(STEPS.OTP);
+                } else {
+                    setError('Failed to send OTP. Please try again.');
+                }
+            } else {
+                // New user — go to Aadhaar step
+                setStep(STEPS.AADHAAR);
+            }
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to check phone');
         } finally {
@@ -314,7 +331,10 @@ export default function AuthPage() {
                             <div>
                                 <h2 className="text-xl font-bold text-white">Verify OTP</h2>
                                 <p className="text-sawaari-muted text-sm">
-                                    Sent to Aadhaar-linked number (XXXX-XXXX-{aadhaarLast4})
+                                    {isExistingUser
+                                        ? `OTP sent to your registered mobile number ending in ${phone.slice(-4)}`
+                                        : `Sent to Aadhaar-linked number (XXXX-XXXX-${aadhaarLast4})`
+                                    }
                                 </p>
                                 <div className="mt-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
                                     <p className="text-amber-400 text-xs font-medium">💡 Demo OTP: <span className="font-bold">123456</span></p>
@@ -325,8 +345,14 @@ export default function AuthPage() {
                             <button type="submit" disabled={loading || otp.length !== 6} className="btn-primary w-full">
                                 {loading ? 'Verifying...' : 'Verify OTP'}
                             </button>
-                            <button type="button" onClick={() => { setStep(STEPS.AADHAAR); setOtp(''); setError(''); }}
-                                className="w-full text-sm text-sawaari-muted hover:text-white transition-colors">← Change Aadhaar</button>
+                            {!isExistingUser && (
+                                <button type="button" onClick={() => { setStep(STEPS.AADHAAR); setOtp(''); setError(''); }}
+                                    className="w-full text-sm text-sawaari-muted hover:text-white transition-colors">← Change Aadhaar</button>
+                            )}
+                            {isExistingUser && (
+                                <button type="button" onClick={() => { setStep(STEPS.PHONE); setOtp(''); setError(''); }}
+                                    className="w-full text-sm text-sawaari-muted hover:text-white transition-colors">← Change number</button>
+                            )}
                         </form>
                     )}
 

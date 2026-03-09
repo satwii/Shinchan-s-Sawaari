@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api';
 
 export default function TripBooking() {
-    const { id } = useParams();
+    const { tripId: id } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
     const isFemale = user?.gender === 'Female';

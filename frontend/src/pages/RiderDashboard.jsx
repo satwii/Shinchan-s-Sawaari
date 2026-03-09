@@ -2,11 +2,16 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 export default function RiderDashboard() {
     const { user } = useAuth();
     const [source, setSource] = useState('');
     const [destination, setDestination] = useState('');
+    const [sourceLat, setSourceLat] = useState(null);
+    const [sourceLng, setSourceLng] = useState(null);
+    const [destLat, setDestLat] = useState(null);
+    const [destLng, setDestLng] = useState(null);
     const [pinkMode, setPinkMode] = useState(false);
     const [trips, setTrips] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -78,13 +83,23 @@ export default function RiderDashboard() {
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="label">From</label>
-                            <input type="text" value={source} onChange={e => setSource(e.target.value)}
-                                placeholder="Source" className="input-field" />
+                            <LocationAutocomplete
+                                value={source}
+                                onChange={setSource}
+                                onSelect={loc => { setSource(loc.name); setSourceLat(loc.lat); setSourceLng(loc.lon); }}
+                                placeholder="Source"
+                                id="ds-rider-source"
+                            />
                         </div>
                         <div>
                             <label className="label">To</label>
-                            <input type="text" value={destination} onChange={e => setDestination(e.target.value)}
-                                placeholder="Destination" className="input-field" />
+                            <LocationAutocomplete
+                                value={destination}
+                                onChange={setDestination}
+                                onSelect={loc => { setDestination(loc.name); setDestLat(loc.lat); setDestLng(loc.lon); }}
+                                placeholder="Destination"
+                                id="ds-rider-dest"
+                            />
                         </div>
                     </div>
                     <button type="submit" disabled={loading}

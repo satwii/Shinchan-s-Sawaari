@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
+import NotificationBell from '../components/NotificationBell';
+import WalletBadge from '../components/WalletBadge';
 
 export default function HomePage() {
     const { user, logout, refreshUser } = useAuth();
@@ -28,9 +30,8 @@ export default function HomePage() {
     }
 
     function handleDriveShare() {
-        if (user?.role === 'driver') navigate('/driver/dashboard');
-        else if (user?.role === 'rider') navigate('/rider/dashboard');
-        else navigate('/driveshare');
+        // Always show role selection — DriveShareEntry handles direction after choice
+        navigate('/driveshare');
     }
 
     return (
@@ -47,10 +48,14 @@ export default function HomePage() {
                             <p className="text-sawaari-muted text-[10px] uppercase tracking-[0.15em]">Hyperlocal Ride Sharing</p>
                         </div>
                     </div>
-                    <button onClick={logout}
-                        className="text-sawaari-muted text-sm hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10">
-                        Logout
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <WalletBadge />
+                        <NotificationBell />
+                        <button onClick={logout}
+                            className="text-sawaari-muted text-sm hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10">
+                            Logout
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -107,6 +112,29 @@ export default function HomePage() {
                             <p className="text-white text-sm font-medium">{displayUser.emergency_contact_name}</p>
                         </div>
                     )}
+
+                    {/* Sawaari Money wallet mini-card */}
+                    <button
+                        onClick={() => navigate('/wallet')}
+                        className="mt-4 w-full rounded-xl px-4 py-3 text-left transition-all"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(79,70,229,0.08))',
+                            border: '1px solid rgba(139,92,246,0.25)',
+                        }}
+                    >
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-purple-300/70 text-[10px] uppercase tracking-widest mb-1">Sawaari Money</p>
+                                <div className="flex items-baseline gap-1">
+                                    <WalletBadge />
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-purple-300 text-xs font-semibold">+ Add Money</p>
+                                <p className="text-purple-300/50 text-[10px] mt-0.5">View History →</p>
+                            </div>
+                        </div>
+                    </button>
                 </div>
 
                 {/* Navigation Cards */}
@@ -142,6 +170,22 @@ export default function HomePage() {
                                 )}
                             </div>
                             <span className="text-sawaari-muted text-xl group-hover:text-emerald-400 group-hover:translate-x-1 transition-all">→</span>
+                        </div>
+                    </button>
+
+                    {/* Sawaari Money */}
+                    <button onClick={() => navigate('/wallet')}
+                        className="card text-left group hover:border-purple-500/30 hover:shadow-lg hover:shadow-purple-500/5 transition-all active:scale-[0.98]"
+                        style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.06), rgba(15,23,42,0.8))' }}>
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-indigo-500/10 border border-purple-500/20 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
+                                💰
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-white font-bold text-lg group-hover:text-purple-400 transition-colors">Sawaari Money</h3>
+                                <p className="text-sawaari-muted text-sm">Wallet · Payments · Refunds</p>
+                            </div>
+                            <span className="text-sawaari-muted text-xl group-hover:text-purple-400 group-hover:translate-x-1 transition-all">→</span>
                         </div>
                     </button>
                 </div>

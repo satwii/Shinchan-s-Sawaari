@@ -7,6 +7,11 @@ export default function MyBookings() {
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
+    // FIX 4: Cancellation summary modal state
+    const [cancelSummary, setCancelSummary] = useState(null); // { fee_amount, fee_percent, refund_amount, message }
+    const [pendingCancelId, setPendingCancelId] = useState(null);
+    const [cancelling, setCancelling] = useState(false);
+
     const fetchBookings = () => {
         setLoading(true);
         api.get('/ts/rider/bookings')
@@ -17,20 +22,41 @@ export default function MyBookings() {
 
     useEffect(() => { fetchBookings(); }, []);
 
-    async function cancelBooking(id) {
-        if (!window.confirm('Cancel this booking? Seats will be restored.')) return;
+    async function handleCancelClick(id) {
+        setPendingCancelId(id);
+        setCancelSummary('confirm'); // Show confirm prompt first
+    }
+
+    async function handleCancelConfirm() {
+        if (!pendingCancelId) return;
+        setCancelling(true);
         try {
-            await api.put(`/ts/rider/bookings/${id}/cancel`);
-            fetchBookings();
+            const res = await api.put(`/ts/rider/bookings/${pendingCancelId}/cancel`);
+            // Show the fee summary BEFORE refreshing bookings
+            setCancelSummary(res.data);
         } catch (err) {
             alert(err.response?.data?.error || 'Failed to cancel');
+            setCancelSummary(null);
+            setPendingCancelId(null);
+        } finally {
+            setCancelling(false);
         }
+    }
+
+    function handleSummaryOk() {
+        setCancelSummary(null);
+        setPendingCancelId(null);
+        fetchBookings(); // Only refresh AFTER user clicks OK
     }
 
     const statusColor = s =>
         s === 'confirmed' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
             s === 'pending' ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' :
                 'text-sawaari-muted bg-sawaari-border/20 border-sawaari-border';
+
+    function fmt(n) {
+        return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
 
     return (
         <div className="min-h-screen bg-sawaari-dark">
@@ -101,7 +127,7 @@ export default function MyBookings() {
                         )}
 
                         {(b.status === 'pending' || b.status === 'confirmed') && (
-                            <button onClick={() => cancelBooking(b.booking_id)}
+                            <button onClick={() => handleCancelClick(b.booking_id)}
                                 className="w-full py-2.5 rounded-xl border border-red-500/30 text-red-400 text-sm hover:bg-red-500/10 transition-colors">
                                 Cancel Booking
                             </button>
@@ -109,6 +135,77 @@ export default function MyBookings() {
                     </div>
                 ))}
             </main>
+
+            {/* FIX 4: Confirm cancel modal */}
+            {cancelSummary === 'confirm' && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => { setCancelSummary(null); setPendingCancelId(null); }} />
+                    <div className="relative w-full max-w-sm bg-sawaari-card rounded-2xl border border-red-500/30 shadow-2xl animate-slide-up p-6 space-y-4">
+                        <div className="text-center">
+                            <div className="text-4xl mb-2">⚠️</div>
+                            <h3 className="text-white font-bold text-lg">Cancel this booking?</h3>
+                            <p className="text-sawaari-muted text-sm mt-1">
+                                A cancellation fee may apply based on time until departure.
+                            </p>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { setCancelSummary(null); setPendingCancelId(null); }}
+                                className="flex-1 py-3 rounded-xl border border-sawaari-border text-white text-sm font-semibold hover:bg-sawaari-card transition-all"
+                            >
+                                Keep Booking
+                            </button>
+                            <button
+                                onClick={handleCancelConfirm}
+                                disabled={cancelling}
+                                className="flex-1 py-3 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-all disabled:opacity-50"
+                            >
+                                {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* FIX 4: Cancellation result summary modal — shown BEFORE ride card disappears */}
+            {cancelSummary && cancelSummary !== 'confirm' && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                    <div className="relative w-full max-w-sm bg-sawaari-card rounded-2xl border border-emerald-500/30 shadow-2xl animate-slide-up p-6 space-y-4">
+                        <div className="text-center">
+                            <div className="text-4xl mb-2">✅</div>
+                            <h3 className="text-white font-bold text-lg">Booking Cancelled</h3>
+                        </div>
+                        <div className="bg-sawaari-dark rounded-xl p-4 space-y-2.5 border border-sawaari-border">
+                            {cancelSummary.fee_amount > 0 ? (
+                                <>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-sawaari-muted">Cancellation fee ({fmt(cancelSummary.fee_percent)}%)</span>
+                                        <span className="text-red-400 font-bold">-₩{fmt(cancelSummary.fee_amount)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-sawaari-muted">Sent to ride owner</span>
+                                        <span className="text-orange-400">₩{fmt(cancelSummary.fee_amount)}</span>
+                                    </div>
+                                    <div className="border-t border-sawaari-border pt-2 mt-2">
+                                        <p className="text-xs text-sawaari-muted text-center">{cancelSummary.message}</p>
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="text-emerald-400 font-semibold text-sm text-center">
+                                    ✅ No cancellation fee charged
+                                </p>
+                            )}
+                        </div>
+                        <button
+                            onClick={handleSummaryOk}
+                            className="btn-primary w-full"
+                        >
+                            OK
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

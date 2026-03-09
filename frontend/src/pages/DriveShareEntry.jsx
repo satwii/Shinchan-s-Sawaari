@@ -7,13 +7,6 @@ export default function DriveShareEntry() {
     const { user, login } = useAuth();
     const navigate = useNavigate();
 
-    // If user already has a role, redirect immediately
-    React.useEffect(() => {
-        if (user?.role === 'driver') navigate('/driver/dashboard', { replace: true });
-        if (user?.role === 'rider') navigate('/rider/dashboard', { replace: true });
-    }, [user?.role, navigate]);
-
-    const [selectedRole, setSelectedRole] = useState(null);
     const [step, setStep] = useState('choose'); // 'choose' | 'driver-details'
     const [licenseNo, setLicenseNo] = useState('');
     const [issueDate, setIssueDate] = useState('');
@@ -21,12 +14,28 @@ export default function DriveShareEntry() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // NO auto-redirect useEffect — role selection ALWAYS shows on every visit
+
     async function handleSelectRole(role) {
-        setSelectedRole(role);
         setError('');
+        // FIX 1: If user is already a driver, go directly to dashboard (skip license form)
+        if (role === 'driver' && user?.role === 'driver') {
+            navigate('/driver/dashboard', { replace: true });
+            return;
+        }
 
         if (role === 'rider') {
-            // Rider doesn't need extra info — set role directly
+            // If user already has a role, navigate directly (no API call needed)
+            if (user?.role === 'rider') {
+                navigate('/rider/dashboard', { replace: true });
+                return;
+            }
+            if (user?.role === 'driver') {
+                // Driver who wants to find a ride as passenger — allow direct access
+                navigate('/rider/search', { replace: true });
+                return;
+            }
+            // New user — set rider role via API
             setLoading(true);
             try {
                 const res = await api.post('/auth/set-driveshare-role', { role: 'rider' });
@@ -38,7 +47,8 @@ export default function DriveShareEntry() {
                 setLoading(false);
             }
         } else {
-            // Driver needs license info
+            // Driver path — show license form for new drivers
+            // Already-registered drivers are handled above (direct navigate)
             setStep('driver-details');
         }
     }
@@ -56,17 +66,22 @@ export default function DriveShareEntry() {
                 issueDate: issueDate || undefined,
                 expiryDate: expiryDate || undefined,
             });
+            // Backend returns success + token whether new or already-registered
             login(res.data.token, res.data.user);
             navigate('/driver/dashboard', { replace: true });
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to register as driver');
+            // Last-resort: if our user context says driver, navigate anyway
+            if (user?.role === 'driver') {
+                navigate('/driver/dashboard', { replace: true });
+            } else {
+                setError(err.response?.data?.error || 'Failed to register as driver');
+            }
         } finally {
             setLoading(false);
         }
     }
 
-    // If user already has a role, show nothing (useEffect will redirect)
-    if (user?.role) return null;
+    // Always show the role choice screen — no early return
 
     return (
         <div className="min-h-screen bg-sawaari-dark flex items-center justify-center p-4">
@@ -89,7 +104,7 @@ export default function DriveShareEntry() {
                         <button
                             onClick={() => handleSelectRole('driver')}
                             disabled={loading}
-                            className="w-full card p-6 text-left group hover:border-primary-500/50 transition-all active:scale-[0.98]"
+                            className={`w-full card p-6 text-left group transition-all active:scale-[0.98] hover:border-blue-500/50`}
                         >
                             <div className="flex items-start gap-4">
                                 <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/20">
@@ -114,7 +129,7 @@ export default function DriveShareEntry() {
                         <button
                             onClick={() => handleSelectRole('rider')}
                             disabled={loading}
-                            className="w-full card p-6 text-left group hover:border-primary-500/50 transition-all active:scale-[0.98]"
+                            className={`w-full card p-6 text-left group transition-all active:scale-[0.98] hover:border-emerald-500/50`}
                         >
                             <div className="flex items-start gap-4">
                                 <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform shadow-lg shadow-emerald-500/20">

@@ -391,23 +391,78 @@ router.get('/rider/bookings', authenticateToken, (req, res) => {
     }
 });
 
-// PUT /api/trips-service/rider/bookings/:id/cancel — Rider cancels booking
+// PUT /api/ts/rider/bookings/:id/cancel — Rider cancels booking
 router.put('/rider/bookings/:id/cancel', authenticateToken, (req, res) => {
     if (req.user.role !== 'rider') return res.status(403).json({ error: 'Rider only' });
     try {
         const bookingId = parseInt(req.params.id);
         const db = getDb();
 
+        console.log('Cancel booking route hit for booking:', bookingId);
+
         const booking = db.prepare(`
-      SELECT b.id, b.trip_id, b.seats_booked FROM bookings b
+      SELECT b.id, b.trip_id, b.seats_booked, b.status,
+             t.trip_date, t.trip_time, t.price_per_seat, t.calculated_fare,
+             v.driver_id
+      FROM bookings b
+      JOIN trips t ON t.id = b.trip_id
+      JOIN vehicles v ON v.id = t.vehicle_id
       WHERE b.id = ? AND b.rider_id = ? AND b.status != 'cancelled'
     `).get(bookingId, req.user.userId);
 
         if (!booking) return res.status(404).json({ error: 'Booking not found or already cancelled' });
 
-        db.prepare(`UPDATE bookings SET status = 'cancelled' WHERE id = ?`).run(bookingId);
+        // ── Calculate cancellation fee ─────────────────────────────────────────
+        const depStr = `${booking.trip_date}T${booking.trip_time || '00:00'}:00`;
+        const hoursUntil = (new Date(depStr) - Date.now()) / 3600000;
 
-        // Restore seats
+        let feePercent = 0;
+        if (hoursUntil <= 0) feePercent = 1.00;
+        else if (hoursUntil <= 2) feePercent = 0.75;
+        else if (hoursUntil <= 6) feePercent = 0.50;
+        else if (hoursUntil <= 12) feePercent = 0.25;
+        else if (hoursUntil <= 24) feePercent = 0.10;
+        // > 24h: 0%
+
+        const baseAmount = booking.price_per_seat * booking.seats_booked;
+        const cancellationFee = Math.round(baseAmount * feePercent * 100) / 100;
+        const refundAmount = Math.round((baseAmount - cancellationFee) * 100) / 100;
+
+        // ── Apply wallet deductions (wrapped in try/catch — non-fatal) ──────────
+        let walletDeducted = false;
+        if (cancellationFee > 0) {
+            try {
+                const passenger = db.prepare(`SELECT sawaari_wallet FROM users WHERE id = ?`).get(req.user.userId);
+                const passengerWallet = passenger?.sawaari_wallet || 0;
+
+                if (passengerWallet >= cancellationFee) {
+                    const passengerNewBal = parseFloat((passengerWallet - cancellationFee).toFixed(2));
+                    db.prepare(`UPDATE users SET sawaari_wallet = ? WHERE id = ?`).run(passengerNewBal, req.user.userId);
+                    db.prepare(`
+                        INSERT INTO wallet_transactions (user_id, type, amount, balance_after, description, ride_id)
+                        VALUES (?, 'debit', ?, ?, ?, ?)
+                    `).run(req.user.userId, cancellationFee, passengerNewBal,
+                        `Cancellation fee (${(feePercent * 100).toFixed(0)}%) — booking #${bookingId}`, null);
+
+                    // Credit to driver
+                    const driver = db.prepare(`SELECT sawaari_wallet FROM users WHERE id = ?`).get(booking.driver_id);
+                    const driverNewBal = parseFloat(((driver?.sawaari_wallet || 0) + cancellationFee).toFixed(2));
+                    db.prepare(`UPDATE users SET sawaari_wallet = ? WHERE id = ?`).run(driverNewBal, booking.driver_id);
+                    db.prepare(`
+                        INSERT INTO wallet_transactions (user_id, type, amount, balance_after, description, ride_id)
+                        VALUES (?, 'credit', ?, ?, ?, ?)
+                    `).run(booking.driver_id, cancellationFee, driverNewBal,
+                        `Cancellation fee received from passenger (booking #${bookingId})`, null);
+
+                    walletDeducted = true;
+                }
+            } catch (walletErr) {
+                console.warn('Wallet deduction failed (non-fatal):', walletErr.message);
+            }
+        }
+
+        // ── Cancel booking and restore seats ───────────────────────────────────
+        db.prepare(`UPDATE bookings SET status = 'cancelled' WHERE id = ?`).run(bookingId);
         db.prepare(`UPDATE trips SET available_seats = available_seats + ? WHERE id = ?`).run(booking.seats_booked, booking.trip_id);
 
         // Re-open if was Full
@@ -418,15 +473,37 @@ router.put('/rider/bookings/:id/cancel', authenticateToken, (req, res) => {
             db.prepare(`UPDATE trips SET status_id = ? WHERE id = ? AND status_id = ?`).run(openId, booking.trip_id, fullId);
         }
 
-        // Refund payment if any
+        // Refund payment record if any
         db.prepare(`UPDATE payments SET status = 'Refunded' WHERE booking_id = ? AND status = 'Completed'`).run(bookingId);
 
-        res.json({ success: true, message: 'Booking cancelled and seats restored' });
+        // Notify driver
+        try {
+            db.prepare(`INSERT INTO notifications (user_id, type, message) VALUES (?, 'passenger_left', ?)`)
+                .run(booking.driver_id,
+                    cancellationFee > 0
+                        ? `A passenger cancelled their booking. You received ₩${cancellationFee.toFixed(0)} as cancellation fee.`
+                        : 'A passenger cancelled their booking (no fee — more than 24h before departure).'
+                );
+        } catch (_) { }
+
+        const feeMsg = cancellationFee > 0
+            ? `Cancellation fee (${(feePercent * 100).toFixed(0)}%): ₩${cancellationFee.toFixed(0)} deducted from your wallet.`
+            : 'No cancellation fee — cancelled more than 24 hours before departure.';
+
+        res.json({
+            success: true,
+            message: feeMsg,
+            fee_percent: feePercent * 100,
+            fee_amount: cancellationFee,
+            refund_amount: refundAmount,
+            wallet_deducted: walletDeducted,
+        });
     } catch (err) {
         console.error('Cancel booking error:', err);
         res.status(500).json({ error: 'Failed to cancel booking' });
     }
 });
+
 
 // ─── PAYMENT ROUTES ───────────────────────────────────────────────────────────
 

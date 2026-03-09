@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -14,11 +15,18 @@ const PORT = process.env.PORT || 5000;
 const CORS_ORIGIN = process.env.CLIENT_ORIGIN
     ? [process.env.CLIENT_ORIGIN]
     : (origin, callback) => {
-        if (!origin || /^http:\/\/localhost:\d+$/.test(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error('CORS not allowed for: ' + origin));
-        }
+        // Allow requests with no origin (mobile apps, curl, Postman)
+        if (!origin) return callback(null, true);
+        // Allow localhost in dev
+        if (/^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
+        if (/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) return callback(null, true);
+        // Allow Render.com deployments
+        if (/\.onrender\.com$/.test(origin)) return callback(null, true);
+        // Allow Azure
+        if (/\.azurewebsites\.net$/.test(origin)) return callback(null, true);
+        // Allow any HTTPS origin in production
+        if (process.env.NODE_ENV === 'production' && origin.startsWith('https://')) return callback(null, true);
+        callback(new Error('CORS not allowed for: ' + origin));
     };
 
 // ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
@@ -132,16 +140,29 @@ app.use('/api/rides', require('./routes/rides'));
 app.use('/api/ts', require('./routes/tripsService'));
 app.use('/api/agent', require('./routes/agent'));
 app.use('/api/transcribe', require('./routes/transcribe'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/fare', require('./routes/fare'));
+app.use('/api/wallet', require('./routes/wallet'));
 
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', service: 'Sawaari Backend', timestamp: new Date().toISOString() });
 });
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'Route not found' });
-});
+// ─── SERVE FRONTEND IN PRODUCTION ──────────────────────────────────────────
+if (process.env.NODE_ENV === 'production') {
+    const buildPath = path.join(__dirname, 'public');
+    app.use(express.static(buildPath));
+    // SPA catch-all — must come after API routes
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(buildPath, 'index.html'));
+    });
+} else {
+    // 404 handler (dev only — in prod the SPA catch-all handles it)
+    app.use((req, res) => {
+        res.status(404).json({ error: 'Route not found' });
+    });
+}
 
 // Error handler
 app.use((err, req, res, next) => {

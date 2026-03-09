@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import FareCard from '../components/FareCard';
 
 const VEHICLE_TYPES = ['Auto', 'Cab', 'SUV', '4-Seater', 'Mini Bus'];
 
@@ -9,7 +11,10 @@ export default function CreateTrip() {
     const [vehicles, setVehicles] = useState([]);
     const [selectedVehicleId, setSelectedVehicleId] = useState(null);
     const [newVehicle, setNewVehicle] = useState({ model: '', type: 'Cab', color: '', capacity: 4 });
-    const [trip, setTrip] = useState({ source: '', destination: '', date: '', time: '', available_seats: 3, price: 0, pink_mode: false });
+    const [trip, setTrip] = useState({ source: '', destination: '', date: '', time: '', available_seats: 3, pink_mode: false });
+    const [tripCoords, setTripCoords] = useState({ srcLat: null, srcLng: null, dstLat: null, dstLng: null });
+    const [calculatedFare, setCalculatedFare] = useState(null);
+    const [selectedVehicleType, setSelectedVehicleType] = useState('Cab');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
@@ -51,7 +56,8 @@ export default function CreateTrip() {
                 date: trip.date,
                 time: trip.time,
                 available_seats: trip.available_seats,
-                price: trip.price,
+                price: calculatedFare || 0,
+                calculated_fare: calculatedFare,
                 pink_mode: trip.pink_mode,
             });
             navigate('/driver/trips');
@@ -99,7 +105,7 @@ export default function CreateTrip() {
                                 <h3 className="text-white font-semibold mb-3">Your Vehicles</h3>
                                 <div className="space-y-2">
                                     {vehicles.map(v => (
-                                        <button key={v.id} onClick={() => { setSelectedVehicleId(v.id); setStep(2); }}
+                                        <button key={v.id} onClick={() => { setSelectedVehicleId(v.id); setSelectedVehicleType(v.type); setStep(2); }}
                                             className={`w-full text-left p-3 rounded-xl border transition-all ${selectedVehicleId === v.id ? 'border-primary-500 bg-primary-500/10' : 'border-sawaari-border hover:border-primary-500/40'}`}>
                                             <p className="text-white font-medium">{v.model} <span className="text-sawaari-muted text-xs">({v.type})</span></p>
                                             <p className="text-sawaari-muted text-xs">{v.color && `${v.color} · `}Capacity: {v.capacity}</p>
@@ -159,13 +165,23 @@ export default function CreateTrip() {
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="label">From</label>
-                                <input type="text" value={trip.source} onChange={e => setTrip({ ...trip, source: e.target.value })}
-                                    placeholder="Source" className="input-field" required />
+                                <LocationAutocomplete
+                                    value={trip.source}
+                                    onChange={v => setTrip({ ...trip, source: v })}
+                                    onSelect={loc => { setTrip(t => ({ ...t, source: loc.name })); setTripCoords(c => ({ ...c, srcLat: loc.lat, srcLng: loc.lon })); }}
+                                    placeholder="Source"
+                                    id="ct-source"
+                                />
                             </div>
                             <div>
                                 <label className="label">To</label>
-                                <input type="text" value={trip.destination} onChange={e => setTrip({ ...trip, destination: e.target.value })}
-                                    placeholder="Destination" className="input-field" required />
+                                <LocationAutocomplete
+                                    value={trip.destination}
+                                    onChange={v => setTrip({ ...trip, destination: v })}
+                                    onSelect={loc => { setTrip(t => ({ ...t, destination: loc.name })); setTripCoords(c => ({ ...c, dstLat: loc.lat, dstLng: loc.lon })); }}
+                                    placeholder="Destination"
+                                    id="ct-destination"
+                                />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
@@ -180,18 +196,19 @@ export default function CreateTrip() {
                                     className="input-field" required />
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="label">Seats Available</label>
-                                <input type="number" value={trip.available_seats} onChange={e => setTrip({ ...trip, available_seats: parseInt(e.target.value) || 1 })}
-                                    min="1" max="50" className="input-field" required />
-                            </div>
-                            <div>
-                                <label className="label">Price / Seat (₹)</label>
-                                <input type="number" value={trip.price} onChange={e => setTrip({ ...trip, price: parseFloat(e.target.value) || 0 })}
-                                    min="0" step="10" className="input-field" placeholder="0 = free" />
-                            </div>
+                        {/* Sawaari Fare Calculator — read only */}
+                        <div>
+                            <label className="label">Seats Available</label>
+                            <input type="number" value={trip.available_seats} onChange={e => setTrip({ ...trip, available_seats: parseInt(e.target.value) || 1 })}
+                                min="1" max="50" className="input-field" required />
                         </div>
+                        <FareCard
+                            sourceLat={tripCoords.srcLat} sourceLng={tripCoords.srcLng}
+                            destLat={tripCoords.dstLat} destLng={tripCoords.dstLng}
+                            vehicleType={selectedVehicleType}
+                            seats={trip.available_seats}
+                            onFareReady={setCalculatedFare}
+                        />
 
                         {/* Pink Mode toggle */}
                         <div>

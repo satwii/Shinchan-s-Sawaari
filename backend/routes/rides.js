@@ -89,6 +89,85 @@ function getPublicProfile(db, userId) {
     };
 }
 
+// ─── GET /api/rides/my ───────────────────────────────────────────────────────
+// MUST be before /:id routes to avoid Express matching 'my' as an id param
+router.get('/my', authenticateToken, (req, res) => {
+    try {
+        const db = getDb();
+
+        const rides = db.prepare(`
+            SELECT DISTINCT
+                r.id, r.source, r.destination, r.date, r.time_slot, r.ride_time, r.vehicle_type,
+                r.seats_available, r.male_count, r.female_count, r.pink_mode, r.expires_at,
+                r.status, r.trip_started, r.trip_started_at, r.trip_completed, r.trip_completed_at,
+                r.vehicle_reg, r.tracking_token,
+                u.username AS owner_username,
+                u.gender AS owner_gender,
+                (SELECT COUNT(*) FROM ride_members rm WHERE rm.ride_id = r.id) AS member_count,
+                CASE WHEN r.user_id = ? THEN 1 ELSE 0 END AS is_owner,
+                (SELECT COUNT(*) FROM ride_requests rr WHERE rr.ride_id = r.id AND rr.status = 'pending') AS pending_requests
+            FROM rides r
+            JOIN users u ON r.user_id = u.id
+            JOIN ride_members rm2 ON rm2.ride_id = r.id AND rm2.user_id = ?
+            ORDER BY r.date DESC, r.ride_time DESC
+        `).all(req.user.userId, req.user.userId);
+
+        res.json({ rides });
+    } catch (err) {
+        console.error('Get my rides error:', err);
+        res.status(500).json({ error: 'Failed to fetch rides' });
+    }
+});
+
+// ─── GET /api/rides/track/:token ─────────────────────────────────────────────
+// Public tracking via shareable link (no auth required)
+// MUST be before /:id routes to avoid Express matching 'track' as an id param
+router.get('/track/:token', (req, res) => {
+    try {
+        const token = req.params.token;
+        const db = getDb();
+
+        const ride = db.prepare(`
+            SELECT r.id, r.source, r.destination, r.date, r.ride_time, r.vehicle_type,
+                   r.trip_started, r.trip_completed, r.vehicle_reg, r.tracking_token,
+                   u.username AS owner_username
+            FROM rides r JOIN users u ON r.user_id = u.id
+            WHERE r.tracking_token = ?
+        `).get(token);
+
+        if (!ride) return res.status(404).json({ error: 'Tracking link not found' });
+
+        const latest = db.prepare(`
+            SELECT lat, lng, timestamp FROM ride_tracking 
+            WHERE ride_id = ? ORDER BY timestamp DESC LIMIT 1
+        `).get(ride.id);
+
+        const history = db.prepare(`
+            SELECT lat, lng, timestamp FROM ride_tracking 
+            WHERE ride_id = ? ORDER BY timestamp ASC
+        `).all(ride.id);
+
+        res.json({
+            ride: {
+                source: ride.source,
+                destination: ride.destination,
+                date: ride.date,
+                ride_time: ride.ride_time,
+                vehicle_type: ride.vehicle_type,
+                trip_started: !!ride.trip_started,
+                trip_completed: !!ride.trip_completed,
+                vehicle_reg: ride.vehicle_reg,
+                owner_username: ride.owner_username,
+            },
+            latest,
+            history,
+        });
+    } catch (err) {
+        console.error('Public tracking error:', err);
+        res.status(500).json({ error: 'Failed to fetch tracking' });
+    }
+});
+
 // ─── POST /api/rides/search ──────────────────────────────────────────────────
 router.post('/search', authenticateToken, (req, res) => {
     try {
@@ -175,7 +254,7 @@ router.post('/register', authenticateToken, (req, res) => {
         const {
             source, destination, date, timeSlot, rideTime, vehicleType,
             seatsAvailable, maleCount, femaleCount, pinkMode,
-            sourceLat, sourceLng, destinationLat, destinationLng
+            sourceLat, sourceLng, destinationLat, destinationLng, calculatedFare
         } = req.body;
 
         if (!source || !destination || !date || !vehicleType || seatsAvailable === undefined) {
@@ -222,8 +301,8 @@ router.post('/register', authenticateToken, (req, res) => {
         const result = db.prepare(`
             INSERT INTO rides (user_id, source, destination, date, time_slot, ride_time, vehicle_type, 
                 seats_available, male_count, female_count, pink_mode, expires_at, tracking_token,
-                source_lat, source_lng, destination_lat, destination_lng)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source_lat, source_lng, destination_lat, destination_lng, calculated_fare)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             req.user.userId,
             source.trim(), destination.trim(),
@@ -234,7 +313,8 @@ router.post('/register', authenticateToken, (req, res) => {
             sourceLat ? parseFloat(sourceLat) : null,
             sourceLng ? parseFloat(sourceLng) : null,
             destinationLat ? parseFloat(destinationLat) : null,
-            destinationLng ? parseFloat(destinationLng) : null
+            destinationLng ? parseFloat(destinationLng) : null,
+            calculatedFare ? parseFloat(calculatedFare) : null
         );
 
         // Auto-add owner as member
@@ -448,6 +528,21 @@ router.post('/:id/requests/:requestId/respond', authenticateToken, (req, res) =>
                 .run(rideId, request.requester_id);
         }
 
+        // ── Create notification for the requester ──────────────────────────
+        const notifMessage = action === 'accept'
+            ? `Your request to join the ride from ${ride.source} → ${ride.destination} has been accepted! 🎉`
+            : `Your request to join the ride from ${ride.source} → ${ride.destination} was not accepted this time.`;
+
+        try {
+            db.prepare(`
+                INSERT INTO notifications (user_id, type, message, ride_id, is_read)
+                VALUES (?, ?, ?, ?, 0)
+            `).run(request.requester_id, action === 'accept' ? 'request_accepted' : 'request_declined', notifMessage, rideId);
+        } catch (notifErr) {
+            // Non-fatal — don't fail the response if notification insert fails
+            console.error('Notification insert error:', notifErr);
+        }
+
         const updatedCount = db.prepare(`SELECT COUNT(*) as cnt FROM ride_members WHERE ride_id = ?`).get(rideId).cnt;
 
         res.json({
@@ -628,83 +723,7 @@ router.get('/:id/tracking', authenticateToken, (req, res) => {
     }
 });
 
-// ─── GET /api/rides/track/:token ─────────────────────────────────────────────
-// Public tracking via shareable link (no auth required)
-router.get('/track/:token', (req, res) => {
-    try {
-        const token = req.params.token;
-        const db = getDb();
-
-        const ride = db.prepare(`
-            SELECT r.id, r.source, r.destination, r.date, r.ride_time, r.vehicle_type,
-                   r.trip_started, r.trip_completed, r.vehicle_reg, r.tracking_token,
-                   u.username AS owner_username
-            FROM rides r JOIN users u ON r.user_id = u.id
-            WHERE r.tracking_token = ?
-        `).get(token);
-
-        if (!ride) return res.status(404).json({ error: 'Tracking link not found' });
-
-        // Check if tracking should still be active (ride time + 3 hours)
-        const latest = db.prepare(`
-            SELECT lat, lng, timestamp FROM ride_tracking 
-            WHERE ride_id = ? ORDER BY timestamp DESC LIMIT 1
-        `).get(ride.id);
-
-        const history = db.prepare(`
-            SELECT lat, lng, timestamp FROM ride_tracking 
-            WHERE ride_id = ? ORDER BY timestamp ASC
-        `).all(ride.id);
-
-        res.json({
-            ride: {
-                source: ride.source,
-                destination: ride.destination,
-                date: ride.date,
-                ride_time: ride.ride_time,
-                vehicle_type: ride.vehicle_type,
-                trip_started: !!ride.trip_started,
-                trip_completed: !!ride.trip_completed,
-                vehicle_reg: ride.vehicle_reg,
-                owner_username: ride.owner_username,
-            },
-            latest,
-            history,
-        });
-    } catch (err) {
-        console.error('Public tracking error:', err);
-        res.status(500).json({ error: 'Failed to fetch tracking' });
-    }
-});
-
-// ─── GET /api/rides/my ───────────────────────────────────────────────────────
-router.get('/my', authenticateToken, (req, res) => {
-    try {
-        const db = getDb();
-
-        const rides = db.prepare(`
-            SELECT DISTINCT
-                r.id, r.source, r.destination, r.date, r.time_slot, r.ride_time, r.vehicle_type,
-                r.seats_available, r.male_count, r.female_count, r.pink_mode, r.expires_at,
-                r.status, r.trip_started, r.trip_started_at, r.trip_completed, r.trip_completed_at,
-                r.vehicle_reg, r.tracking_token,
-                u.username AS owner_username,
-                u.gender AS owner_gender,
-                (SELECT COUNT(*) FROM ride_members rm WHERE rm.ride_id = r.id) AS member_count,
-                CASE WHEN r.user_id = ? THEN 1 ELSE 0 END AS is_owner,
-                (SELECT COUNT(*) FROM ride_requests rr WHERE rr.ride_id = r.id AND rr.status = 'pending') AS pending_requests
-            FROM rides r
-            JOIN users u ON r.user_id = u.id
-            JOIN ride_members rm2 ON rm2.ride_id = r.id AND rm2.user_id = ?
-            ORDER BY r.date DESC, r.ride_time DESC
-        `).all(req.user.userId, req.user.userId);
-
-        res.json({ rides });
-    } catch (err) {
-        console.error('Get my rides error:', err);
-        res.status(500).json({ error: 'Failed to fetch rides' });
-    }
-});
+// NOTE: /my and /track/:token routes moved above /:id routes at top of file to fix Express route ordering.
 
 // ─── GET /api/rides/:id/members ──────────────────────────────────────────────
 router.get('/:id/members', authenticateToken, (req, res) => {
@@ -850,4 +869,141 @@ router.get('/:id/check-ratings', authenticateToken, (req, res) => {
     }
 });
 
+// ─── POST /api/rides/:id/cancel — ride owner cancels ─────────────────────────
+router.post('/:id/cancel', authenticateToken, (req, res) => {
+    try {
+        const rideId = parseInt(req.params.id);
+        const db = getDb();
+        const { transferWallet } = require('./wallet');
+
+        const ride = db.prepare(`SELECT * FROM rides WHERE id = ?`).get(rideId);
+        if (!ride) return res.status(404).json({ error: 'Ride not found' });
+        if (ride.user_id !== req.user.userId) return res.status(403).json({ error: 'Only the ride owner can cancel' });
+        if (ride.status === 'cancelled') return res.status(400).json({ error: 'Ride already cancelled' });
+
+        const hoursLeft = hoursUntil(ride.date, ride.ride_time);
+        const penaltyPct = ownerPenaltyPercent(hoursLeft);
+
+        // All members except the owner who also paid
+        const members = db.prepare(`
+            SELECT rm.user_id FROM ride_members rm WHERE rm.ride_id = ? AND rm.user_id != ?
+        `).all(rideId, req.user.userId);
+
+        // Owner pays penalty to each passenger
+        if (penaltyPct > 0 && members.length > 0) {
+            const fare = ride.calculated_fare || 0;
+            const penaltyPerPerson = Math.round(fare * penaltyPct * 100) / 100;
+            for (const m of members) {
+                try {
+                    transferWallet(db, req.user.userId, m.user_id, penaltyPerPerson, rideId,
+                        `Owner cancellation penalty — ₩${penaltyPerPerson} compensation for ride cancellation`);
+                } catch (e) { console.warn('Penalty transfer failed:', e.message); }
+            }
+        }
+
+        // Update ride status
+        db.prepare(`UPDATE rides SET status = 'cancelled', cancelled_at = datetime('now') WHERE id = ?`).run(rideId);
+
+        // Notify all members
+        const ownerUser = db.prepare(`SELECT username FROM users WHERE id = ?`).get(req.user.userId);
+        const penaltyMsg = penaltyPct > 0
+            ? ` You received a ${(penaltyPct * 100).toFixed(0)}% compensation in Sawaari Money.`
+            : '';
+        for (const m of members) {
+            try {
+                db.prepare(`INSERT INTO notifications (user_id, type, message, ride_id) VALUES (?, 'ride_cancelled', ?, ?)`)
+                    .run(m.user_id, `The ride from ${ride.source} → ${ride.destination} was cancelled by the owner.${penaltyMsg}`, rideId);
+            } catch (_) { }
+        }
+
+        res.json({ success: true, message: 'Ride cancelled', penalty_percent: penaltyPct * 100 });
+    } catch (err) {
+        console.error('Cancel ride error:', err);
+        res.status(500).json({ error: err.message || 'Failed to cancel ride' });
+    }
+});
+
+// ─── POST /api/rides/:id/leave — passenger leaves a ride ─────────────────────
+router.post('/:id/leave', authenticateToken, (req, res) => {
+    try {
+        const rideId = parseInt(req.params.id);
+        const db = getDb();
+        const { transferWallet } = require('./wallet');
+
+        const ride = db.prepare(`SELECT * FROM rides WHERE id = ?`).get(rideId);
+        if (!ride) return res.status(404).json({ error: 'Ride not found' });
+        if (ride.user_id === req.user.userId) return res.status(400).json({ error: 'Use cancel ride instead' });
+
+        const member = db.prepare(`SELECT * FROM ride_members WHERE ride_id = ? AND user_id = ?`).get(rideId, req.user.userId);
+        if (!member) return res.status(404).json({ error: 'You are not a member of this ride' });
+
+        const hoursLeft = hoursUntil(ride.date, ride.ride_time);
+        const afterStarted = ride.trip_started;
+        const feePct = afterStarted ? 1.0 : passengerFeePercent(hoursLeft);
+
+        const fare = ride.calculated_fare || 0;
+        const feeAmount = Math.round(fare * feePct * 100) / 100;
+
+        // Transfer fee to ride owner (if any)
+        if (feeAmount > 0) {
+            try {
+                transferWallet(db, req.user.userId, ride.user_id, feeAmount, rideId,
+                    `Cancellation fee (${(feePct * 100).toFixed(0)}%) for leaving ride ${ride.source} → ${ride.destination}`);
+            } catch (e) {
+                return res.status(400).json({ error: e.message });
+            }
+        }
+
+        // Remove from ride_members
+        db.prepare(`DELETE FROM ride_members WHERE ride_id = ? AND user_id = ?`).run(rideId, req.user.userId);
+
+        // Update request status
+        db.prepare(`UPDATE ride_requests SET status = 'cancelled' WHERE ride_id = ? AND requester_id = ?`).run(rideId, req.user.userId);
+
+        // Notify owner
+        try {
+            const leaver = db.prepare(`SELECT username FROM users WHERE id = ?`).get(req.user.userId);
+            db.prepare(`INSERT INTO notifications (user_id, type, message, ride_id) VALUES (?, 'passenger_left', ?, ?)`)
+                .run(ride.user_id, `${leaver.username} left your ride from ${ride.source} → ${ride.destination}. Cancellation fee ₩${feeAmount} credited to your wallet.`, rideId);
+        } catch (_) { }
+
+        res.json({
+            success: true,
+            fee_percent: feePct * 100,
+            fee_amount: feeAmount,
+            message: feeAmount > 0 ? `Left ride. ₩${feeAmount} cancellation fee charged.` : 'Left ride. No fee — cancelled more than 24h before departure.',
+        });
+    } catch (err) {
+        console.error('Leave ride error:', err);
+        res.status(500).json({ error: err.message || 'Failed to leave ride' });
+    }
+});
+
 module.exports = router;
+
+// ─── CANCEL / LEAVE helpers ───────────────────────────────────────────────────
+// These are appended after the main router export so they can use
+// transferWallet from wallet.js without circular dependency issues.
+
+// Cancellation fee % for passengers based on hours until departure
+function passengerFeePercent(hoursLeft) {
+    if (hoursLeft > 24) return 0;
+    if (hoursLeft > 12) return 0.10;
+    if (hoursLeft > 6) return 0.25;
+    if (hoursLeft > 2) return 0.50;
+    return 0.75;
+}
+
+// Penalty % for owner cancelling
+function ownerPenaltyPercent(hoursLeft) {
+    if (hoursLeft > 24) return 0;
+    if (hoursLeft > 12) return 0.10;
+    if (hoursLeft > 2) return 0.25;
+    return 0.50;
+}
+
+function hoursUntil(dateStr, timeStr) {
+    const depStr = `${dateStr}T${timeStr || '00:00'}:00`;
+    const dep = new Date(depStr);
+    return (dep - Date.now()) / 3600000;
+}

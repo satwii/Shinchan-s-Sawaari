@@ -122,6 +122,13 @@ export default function RideDetailPage() {
     const [ratings, setRatings] = useState({});
     const [ratedUsers, setRatedUsers] = useState([]);
 
+    // Cancellation modal
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [cancelType, setCancelType] = useState(null); // 'leave' | 'cancel'
+    const [cancelLoading, setCancelLoading] = useState(false);
+    const [cancelMsg, setCancelMsg] = useState('');
+    const [cancelResult, setCancelResult] = useState(null); // result summary after success
+
     const fetchRide = useCallback(async () => {
         try {
             const res = await api.get(`/rides/${id}/detail`);
@@ -302,6 +309,51 @@ export default function RideDetailPage() {
             setMsg(err.response?.data?.error || 'Failed');
         } finally {
             setActionLoading(false);
+        }
+    }
+
+    // Cancellation helpers
+    function hoursUntilRide() {
+        if (!ride?.date || !ride?.ride_time) return 999;
+        const dep = new Date(`${ride.date}T${ride.ride_time}:00`);
+        return (dep - Date.now()) / 3600000;
+    }
+    function getCancelFeeInfo() {
+        const h = hoursUntilRide();
+        if (cancelType === 'cancel') {
+            // Owner cancels
+            if (h > 24) return { pct: 0, label: 'No penalty — more than 24h before departure' };
+            if (h > 12) return { pct: 10, label: '10% penalty — 12-24h before departure' };
+            if (h > 2) return { pct: 25, label: '25% penalty — 2-12h before departure' };
+            return { pct: 50, label: '50% penalty — less than 2h before departure' };
+        } else {
+            // Passenger leaves
+            if (h > 24) return { pct: 0, label: 'Free cancellation — more than 24h before departure' };
+            if (h > 12) return { pct: 10, label: '10% fee — 12-24h before departure' };
+            if (h > 6) return { pct: 25, label: '25% fee — 6-12h before departure' };
+            if (h > 2) return { pct: 50, label: '50% fee — 2-6h before departure' };
+            return { pct: 75, label: '75% fee — less than 2h before departure' };
+        }
+    }
+    async function handleCancelConfirm() {
+        setCancelLoading(true);
+        setCancelMsg('');
+        try {
+            let result;
+            if (cancelType === 'cancel') {
+                const res = await api.post(`/rides/${id}/cancel`);
+                result = res.data;
+            } else {
+                const res = await api.post(`/rides/${id}/leave`);
+                result = res.data;
+            }
+            // Close confirm modal, show result summary
+            setShowCancelModal(false);
+            setCancelResult(result);
+        } catch (err) {
+            setCancelMsg(err.response?.data?.error || 'Failed');
+        } finally {
+            setCancelLoading(false);
         }
     }
 
@@ -753,7 +805,160 @@ export default function RideDetailPage() {
                         ⭐ Rate Your Co-riders
                     </button>
                 )}
+
+                {/* Leave Ride — member who is not the owner */}
+                {isMember && !isOwner && !ride?.trip_completed && (
+                    <button
+                        onClick={() => { setCancelType('leave'); setCancelMsg(''); setShowCancelModal(true); }}
+                        className="w-full py-3 rounded-xl border border-red-500/30 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition-all"
+                    >
+                        🚪 Leave Ride
+                    </button>
+                )}
+
+                {/* Cancel Ride — owner can cancel if not yet started */}
+                {isOwner && !ride?.trip_started && !ride?.trip_completed && ride?.status !== 'cancelled' && (
+                    <button
+                        onClick={() => { setCancelType('cancel'); setCancelMsg(''); setShowCancelModal(true); }}
+                        className="w-full py-3 rounded-xl border border-red-500/30 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition-all mt-2"
+                    >
+                        ✕ Cancel Ride
+                    </button>
+                )}
             </main>
+
+            {/* Cancellation Modal */}
+            {showCancelModal && (() => {
+                const feeInfo = getCancelFeeInfo();
+                const fare = ride?.calculated_fare || 0;
+                const feeAmt = Math.round(fare * feeInfo.pct) / 100;
+                const hoursLeft = hoursUntilRide();
+                const timeLabel = hoursLeft > 48 ? `${Math.floor(hoursLeft / 24)} days` :
+                    hoursLeft > 1 ? `${Math.floor(hoursLeft)} hours` : 'Less than 1 hour';
+                return (
+                    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setShowCancelModal(false)} />
+                        <div className="relative w-full max-w-sm bg-sawaari-card rounded-2xl border border-red-500/30 shadow-2xl animate-slide-up p-6 space-y-4">
+                            <div className="text-center">
+                                <div className="text-4xl mb-2">⚠️</div>
+                                <h3 className="text-white font-bold text-lg">
+                                    {cancelType === 'cancel' ? 'Cancel this ride?' : 'Leave this ride?'}
+                                </h3>
+                            </div>
+
+                            <div className="bg-sawaari-dark rounded-xl p-4 space-y-2.5 border border-sawaari-border">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-sawaari-muted">Route</span>
+                                    <span className="text-white font-medium">{ride?.source} → {ride?.destination}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-sawaari-muted">Departure</span>
+                                    <span className="text-white">{ride?.date} at {ride?.ride_time}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-sawaari-muted">Time remaining</span>
+                                    <span className="text-amber-400 font-semibold">{timeLabel}</span>
+                                </div>
+                                <div className="border-t border-sawaari-border pt-2 mt-2">
+                                    <p className="text-xs text-sawaari-muted mb-1">{feeInfo.label}</p>
+                                    {feeInfo.pct > 0 ? (
+                                        <>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-sawaari-muted">Cancellation fee ({feeInfo.pct}%)</span>
+                                                <span className="text-red-400 font-bold">₩{feeAmt.toFixed(0)}</span>
+                                            </div>
+                                            {cancelType === 'leave' && (
+                                                <div className="flex justify-between text-sm mt-1">
+                                                    <span className="text-sawaari-muted">Goes to ride owner</span>
+                                                    <span className="text-orange-400">₩{feeAmt.toFixed(0)}</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="text-emerald-400 font-semibold text-sm">✅ No fee — free cancellation</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {cancelMsg && (
+                                <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{cancelMsg}</p>
+                            )}
+
+                            <div className="flex gap-3">
+                                <button onClick={() => setShowCancelModal(false)}
+                                    className="flex-1 py-3 rounded-xl border border-sawaari-border text-white text-sm font-semibold hover:bg-sawaari-card transition-all">
+                                    Keep My Booking
+                                </button>
+                                <button onClick={handleCancelConfirm} disabled={cancelLoading}
+                                    className="flex-1 py-3 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-all active:scale-95 disabled:opacity-50">
+                                    {cancelLoading ? 'Processing...' : cancelType === 'cancel' ? 'Cancel Ride' : 'Leave Ride'}
+                                </button>
+                            </div>
+
+                            <p className="text-sawaari-muted text-[10px] text-center">
+                                ⚠️ Free cancellation available more than 24 hours before departure
+                            </p>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* SOS Floating Button */}
+            {isMember && !ride?.trip_completed && (
+                <button onClick={triggerSOS}
+                    className="fixed bottom-6 right-6 z-40 w-16 h-16 rounded-full bg-red-600 shadow-2xl shadow-red-600/50 flex items-center justify-center text-white font-black text-sm animate-pulse hover:bg-red-700 active:scale-90 transition-all border-2 border-red-400">
+                    SOS
+                </button>
+            )}
+
+            {/* Cancellation Result Summary Modal (FIX 4) */}
+            {cancelResult && (
+                <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                    <div className="relative w-full max-w-sm bg-sawaari-card rounded-2xl border border-emerald-500/30 shadow-2xl animate-slide-up p-6 space-y-4">
+                        <div className="text-center">
+                            <div className="text-4xl mb-2">✅</div>
+                            <h3 className="text-white font-bold text-lg">
+                                {cancelType === 'cancel' ? 'Ride Cancelled' : 'Booking Cancelled'}
+                            </h3>
+                        </div>
+
+                        <div className="bg-sawaari-dark rounded-xl p-4 space-y-2.5 border border-sawaari-border">
+                            {cancelResult.fee_amount > 0 ? (
+                                <>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-sawaari-muted">Cancellation fee ({cancelResult.fee_percent?.toFixed(0)}%)</span>
+                                        <span className="text-red-400 font-bold">-₩{Number(cancelResult.fee_amount).toFixed(0)}</span>
+                                    </div>
+                                    {cancelType === 'leave' && (
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-sawaari-muted">Sent to ride owner</span>
+                                            <span className="text-orange-400">₩{Number(cancelResult.fee_amount).toFixed(0)}</span>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <p className="text-emerald-400 font-semibold text-sm text-center">
+                                    ✅ No cancellation fee charged
+                                </p>
+                            )}
+                            <div className="border-t border-sawaari-border pt-2">
+                                <p className="text-sawaari-muted text-xs text-center">{cancelResult.message}</p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setCancelResult(null);
+                                fetchRide();
+                            }}
+                            className="btn-primary w-full"
+                        >
+                            OK
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* SOS Floating Button */}
             {isMember && !ride?.trip_completed && (

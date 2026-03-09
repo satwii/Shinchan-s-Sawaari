@@ -16,12 +16,13 @@ import RiderDashboard from './pages/RiderDashboard';
 import SawaariAI from './components/SawaariAI';
 
 // Lazy-load optional sub-pages (they may or may not exist)
-let CreateTrip, DriverTrips, DriverBookings, TripBooking, MyBookings;
+let CreateTrip, DriverTrips, DriverBookings, TripBooking, MyBookings, WalletPage;
 try { CreateTrip = require('./pages/CreateTrip').default; } catch { CreateTrip = null; }
 try { DriverTrips = require('./pages/DriverTrips').default; } catch { DriverTrips = null; }
 try { DriverBookings = require('./pages/DriverBookings').default; } catch { DriverBookings = null; }
 try { TripBooking = require('./pages/TripBooking').default; } catch { TripBooking = null; }
 try { MyBookings = require('./pages/MyBookings').default; } catch { MyBookings = null; }
+try { WalletPage = require('./pages/WalletPage').default; } catch { WalletPage = null; }
 
 function PrivateRoute({ children }) {
   const { user, token } = useAuth();
@@ -86,6 +87,8 @@ export default function App() {
           <Route path="/rider/dashboard" element={
             <PrivateRoute><RoleRoute role="rider"><RiderDashboard /></RoleRoute></PrivateRoute>
           } />
+          {/* /rider/search — accessible to ANY authenticated user (e.g. a driver browsing as passenger) */}
+          <Route path="/rider/search" element={<PrivateRoute><RiderDashboard /></PrivateRoute>} />
           {TripBooking && (
             <Route path="/rider/book/:tripId" element={
               <PrivateRoute><RoleRoute role="rider"><TripBooking /></RoleRoute></PrivateRoute>
@@ -95,6 +98,11 @@ export default function App() {
             <Route path="/rider/bookings" element={
               <PrivateRoute><RoleRoute role="rider"><MyBookings /></RoleRoute></PrivateRoute>
             } />
+          )}
+
+          {/* Wallet — accessible to any authenticated user */}
+          {WalletPage && (
+            <Route path="/wallet" element={<PrivateRoute><WalletPage /></PrivateRoute>} />
           )}
 
           {/* Catch all */}
