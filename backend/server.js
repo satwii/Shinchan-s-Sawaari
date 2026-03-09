@@ -37,6 +37,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
 }));
+// Handle OPTIONS preflight for all routes (required for CORS in production)
+app.options('*', cors());
 app.use(express.json());
 
 // ─── SOCKET.IO ────────────────────────────────────────────────────────────────
