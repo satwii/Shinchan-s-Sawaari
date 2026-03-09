@@ -46,8 +46,8 @@ const corsOptions = {
 
 // ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
 // Handle OPTIONS preflight BEFORE other middleware so it always responds correctly
-app.options('*', cors(corsOptions));
-app.use(cors(corsOptions));
+app.use(cors());
+app.options('*', cors());
 app.use(express.json());
 
 // ─── SOCKET.IO ────────────────────────────────────────────────────────────────
