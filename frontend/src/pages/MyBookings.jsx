@@ -106,7 +106,7 @@ export default function MyBookings() {
                             <div className="bg-sawaari-dark/50 rounded-xl p-2 text-center">
                                 {b.payment_status ? (
                                     <>
-                                        <p className="text-emerald-400 text-sm font-semibold">₹{b.amount}</p>
+                                        <p className="text-emerald-400 text-sm font-semibold">₩{b.amount}</p>
                                         <p className="text-sawaari-muted text-[10px] mt-0.5">{b.payment_mode}</p>
                                     </>
                                 ) : (

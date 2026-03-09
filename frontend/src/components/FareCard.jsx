@@ -74,8 +74,8 @@ export default function FareCard({ sourceLat, sourceLng, destLat, destLng, vehic
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
                 {[
                     { label: 'Distance', value: `${fare.distance_km} km` },
-                    { label: 'Petrol rate', value: `₹${fare.petrol_price_per_litre}/L` },
-                    { label: 'Fuel cost', value: `₹${fare.fuel_cost}` },
+                    { label: 'Petrol rate', value: `₩${fare.petrol_price_per_litre}/L` },
+                    { label: 'Fuel cost', value: `₩${fare.fuel_cost}` },
                     { label: `${fare.breakdown.total_persons} persons share`, value: `₩${fare.cost_per_person.toFixed(0)} each` },
                 ].map(({ label, value }) => (
                     <div key={label} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '8px 10px' }}>

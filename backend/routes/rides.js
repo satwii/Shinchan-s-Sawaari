@@ -27,6 +27,26 @@ function haversineKm(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Haversine distance in METRES between two lat/lng points
+function haversineMetres(lat1, lng1, lat2, lng2) {
+    return haversineKm(lat1, lng1, lat2, lng2) * 1000;
+}
+
+// En-route matching: checks if passenger pickup/drop lie along a polyline
+function isEnRoute(polylinePoints, pickupLat, pickupLng, dropLat, dropLng, thresholdM = 400) {
+    let pickupIdx = -1;
+    let dropIdx = -1;
+    polylinePoints.forEach(([lng, lat], idx) => {
+        if (haversineMetres(lat, lng, pickupLat, pickupLng) <= thresholdM) {
+            if (pickupIdx === -1) pickupIdx = idx;
+        }
+        if (pickupIdx !== -1 && haversineMetres(lat, lng, dropLat, dropLng) <= thresholdM) {
+            if (dropIdx === -1) dropIdx = idx;
+        }
+    });
+    return pickupIdx !== -1 && dropIdx !== -1 && dropIdx > pickupIdx;
+}
+
 const MATCH_RADIUS_KM = 5; // rides within 5 km radius are considered overlapping
 
 function routeOverlaps(ride, searchSource, searchDest, searchSrcLat, searchSrcLng, searchDstLat, searchDstLng) {
@@ -89,7 +109,7 @@ function getPublicProfile(db, userId) {
     };
 }
 
-// ─── GET /api/rides/my ───────────────────────────────────────────────────────
+// ─── GET /api/rides/my ────────────────────────────────────────────────────────
 // MUST be before /:id routes to avoid Express matching 'my' as an id param
 router.get('/my', authenticateToken, (req, res) => {
     try {
@@ -109,6 +129,19 @@ router.get('/my', authenticateToken, (req, res) => {
             FROM rides r
             JOIN users u ON r.user_id = u.id
             JOIN ride_members rm2 ON rm2.ride_id = r.id AND rm2.user_id = ?
+            WHERE (
+                -- Show completed/active (started) rides always
+                r.trip_completed = 1
+                OR r.trip_started = 1
+                -- Show upcoming: departure in the future OR status is not expired/cancelled
+                OR (r.trip_completed = 0 AND r.trip_started = 0
+                    AND r.status NOT IN ('expired', 'cancelled')
+                    AND (
+                        r.ride_time IS NULL
+                        OR datetime(r.date || 'T' || r.ride_time || ':00') > datetime('now')
+                    )
+                )
+            )
             ORDER BY r.date DESC, r.ride_time DESC
         `).all(req.user.userId, req.user.userId);
 
@@ -873,29 +906,56 @@ router.get('/:id/check-ratings', authenticateToken, (req, res) => {
 router.post('/:id/cancel', authenticateToken, (req, res) => {
     try {
         const rideId = parseInt(req.params.id);
+        const userId = req.user.userId;
         const db = getDb();
         const { transferWallet } = require('./wallet');
 
+        console.log('CANCEL HIT:', { ride_id: rideId, userId, rideType: 'owner-cancel' });
+
         const ride = db.prepare(`SELECT * FROM rides WHERE id = ?`).get(rideId);
         if (!ride) return res.status(404).json({ error: 'Ride not found' });
-        if (ride.user_id !== req.user.userId) return res.status(403).json({ error: 'Only the ride owner can cancel' });
+        if (ride.user_id !== userId) return res.status(403).json({ error: 'Only the ride owner can cancel' });
         if (ride.status === 'cancelled') return res.status(400).json({ error: 'Ride already cancelled' });
 
-        const hoursLeft = hoursUntil(ride.date, ride.ride_time);
-        const penaltyPct = ownerPenaltyPercent(hoursLeft);
-
-        // All members except the owner who also paid
+        // All members except the owner
         const members = db.prepare(`
             SELECT rm.user_id FROM ride_members rm WHERE rm.ride_id = ? AND rm.user_id != ?
-        `).all(rideId, req.user.userId);
+        `).all(rideId, userId);
 
-        // Owner pays penalty to each passenger
+        // ── FIX 1: FareShare cancel — full refund to all members, no penalty ────
+        if (ride.type === 'fareshare') {
+            const fare = ride.calculated_fare || 0;
+            for (const m of members) {
+                if (fare > 0) {
+                    try {
+                        db.prepare(`UPDATE users SET sawaari_wallet = sawaari_wallet + ? WHERE id = ?`).run(fare, m.user_id);
+                        db.prepare(`INSERT INTO wallet_transactions (user_id, type, amount, description, ride_id) VALUES (?, 'credit', ?, ?, ?)`)
+                            .run(m.user_id, fare, `Full refund — FareShare ride cancelled by owner (${ride.source} → ${ride.destination})`, rideId);
+                    } catch (walletErr) {
+                        console.warn('FareShare refund error (non-fatal):', walletErr.message);
+                    }
+                }
+                try {
+                    db.prepare(`INSERT INTO notifications (user_id, type, message, ride_id) VALUES (?, 'ride_cancelled', ?, ?)`)
+                        .run(m.user_id, `The FareShare ride from ${ride.source} → ${ride.destination} was cancelled by the organiser. Full refund issued — no cancellation fee.`, rideId);
+                } catch (_) { }
+            }
+            db.prepare(`UPDATE rides SET status = 'cancelled', cancelled_at = datetime('now') WHERE id = ?`).run(rideId);
+            return res.json({ success: true, message: 'FareShare ride cancelled. Full refunds issued to all members.', penalty_percent: 0 });
+        }
+
+        // ── DriveShare cancel: owner pays penalty to passengers ──────────────────
+        const departureTime = new Date(`${ride.date}T${ride.ride_time || '00:00'}:00`);
+        const hoursLeft = (departureTime - new Date()) / (1000 * 60 * 60);
+        console.log('Departure:', departureTime, 'Now:', new Date(), 'Hours until:', hoursLeft);
+        const penaltyPct = ownerPenaltyPercent(hoursLeft);
+
         if (penaltyPct > 0 && members.length > 0) {
             const fare = ride.calculated_fare || 0;
             const penaltyPerPerson = Math.round(fare * penaltyPct * 100) / 100;
             for (const m of members) {
                 try {
-                    transferWallet(db, req.user.userId, m.user_id, penaltyPerPerson, rideId,
+                    transferWallet(db, userId, m.user_id, penaltyPerPerson, rideId,
                         `Owner cancellation penalty — ₩${penaltyPerPerson} compensation for ride cancellation`);
                 } catch (e) { console.warn('Penalty transfer failed:', e.message); }
             }
@@ -905,7 +965,6 @@ router.post('/:id/cancel', authenticateToken, (req, res) => {
         db.prepare(`UPDATE rides SET status = 'cancelled', cancelled_at = datetime('now') WHERE id = ?`).run(rideId);
 
         // Notify all members
-        const ownerUser = db.prepare(`SELECT username FROM users WHERE id = ?`).get(req.user.userId);
         const penaltyMsg = penaltyPct > 0
             ? ` You received a ${(penaltyPct * 100).toFixed(0)}% compensation in Sawaari Money.`
             : '';
@@ -927,50 +986,129 @@ router.post('/:id/cancel', authenticateToken, (req, res) => {
 router.post('/:id/leave', authenticateToken, (req, res) => {
     try {
         const rideId = parseInt(req.params.id);
+        const userId = req.user.userId;
         const db = getDb();
         const { transferWallet } = require('./wallet');
 
+        console.log('CANCEL HIT:', { ride_id: rideId, userId, rideType: 'leave' });
+
         const ride = db.prepare(`SELECT * FROM rides WHERE id = ?`).get(rideId);
         if (!ride) return res.status(404).json({ error: 'Ride not found' });
-        if (ride.user_id === req.user.userId) return res.status(400).json({ error: 'Use cancel ride instead' });
+        if (ride.user_id === userId) return res.status(400).json({ error: 'Use cancel ride instead' });
 
-        const member = db.prepare(`SELECT * FROM ride_members WHERE ride_id = ? AND user_id = ?`).get(rideId, req.user.userId);
+        const member = db.prepare(`SELECT * FROM ride_members WHERE ride_id = ? AND user_id = ?`).get(rideId, userId);
         if (!member) return res.status(404).json({ error: 'You are not a member of this ride' });
 
-        const hoursLeft = hoursUntil(ride.date, ride.ride_time);
-        const afterStarted = ride.trip_started;
-        const feePct = afterStarted ? 1.0 : passengerFeePercent(hoursLeft);
+        const leaver = db.prepare(`SELECT username FROM users WHERE id = ?`).get(userId);
+
+        // ── FIX 1: FareShare rides — free cancellation, notify group, keep ride active ──
+        if (ride.type === 'fareshare') {
+            // Full refund — no fee charged to anyone
+            const fare = ride.calculated_fare || 0;
+            if (fare > 0) {
+                try {
+                    // Refund the paid amount back to the passenger
+                    db.prepare(`UPDATE users SET sawaari_wallet = sawaari_wallet + ? WHERE id = ?`).run(fare, userId);
+                    db.prepare(`
+                        INSERT INTO wallet_transactions (user_id, type, amount, description, ride_id)
+                        VALUES (?, 'credit', ?, ?, ?)
+                    `).run(userId, fare, `Full refund — left FareShare ride ${ride.source} → ${ride.destination}`, rideId);
+                } catch (walletErr) {
+                    console.warn('FareShare refund error (non-fatal):', walletErr.message);
+                }
+            }
+
+            // Remove member from ride
+            db.prepare(`DELETE FROM ride_members WHERE ride_id = ? AND user_id = ?`).run(rideId, userId);
+            db.prepare(`UPDATE ride_requests SET status = 'cancelled' WHERE ride_id = ? AND requester_id = ?`).run(rideId, userId);
+
+            // Notify remaining group members (not the leaver)
+            const remainingMembers = db.prepare(`
+                SELECT rm.user_id FROM ride_members rm WHERE rm.ride_id = ? AND rm.user_id != ?
+            `).all(rideId, userId);
+            for (const m of remainingMembers) {
+                try {
+                    db.prepare(`INSERT INTO notifications (user_id, type, message, ride_id) VALUES (?, 'passenger_left', ?, ?)`)
+                        .run(m.user_id, `${leaver.username} has left the ride. You can continue as planned.`, rideId);
+                } catch (_) { }
+            }
+            // Notify owner
+            try {
+                db.prepare(`INSERT INTO notifications (user_id, type, message, ride_id) VALUES (?, 'passenger_left', ?, ?)`)
+                    .run(ride.user_id, `${leaver.username} has left the ride. You can continue as planned.`, rideId);
+            } catch (_) { }
+
+            return res.json({
+                success: true,
+                fee_percent: 0,
+                fee_amount: 0,
+                message: 'Left FareShare ride. Full refund processed — no cancellation fee for FareShare.',
+            });
+        }
+
+        // ── DriveShare: standard cancellation fee logic ──────────────────────────
+        const departureTime = new Date(`${ride.date}T${ride.ride_time || '00:00'}:00`);
+        const hoursLeft = (departureTime - new Date()) / (1000 * 60 * 60);
+        console.log('Departure:', departureTime, 'Now:', new Date(), 'Hours until:', hoursLeft);
+        console.log('ride.date:', ride.date, 'ride.ride_time:', ride.ride_time);
+
+        let feePct = 0;
+        if (ride.trip_started) feePct = 1.0;
+        else if (hoursLeft <= 0) feePct = 1.00;
+        else if (hoursLeft <= 2) feePct = 0.75;
+        else if (hoursLeft <= 6) feePct = 0.50;
+        else if (hoursLeft <= 12) feePct = 0.25;
+        else if (hoursLeft <= 24) feePct = 0.10;
+        // > 24h: 0%
 
         const fare = ride.calculated_fare || 0;
         const feeAmount = Math.round(fare * feePct * 100) / 100;
+        const refundAmount = Math.round((fare - feeAmount) * 100) / 100;
 
-        // Transfer fee to ride owner (if any)
-        if (feeAmount > 0) {
-            try {
-                transferWallet(db, req.user.userId, ride.user_id, feeAmount, rideId,
-                    `Cancellation fee (${(feePct * 100).toFixed(0)}%) for leaving ride ${ride.source} → ${ride.destination}`);
-            } catch (e) {
-                return res.status(400).json({ error: e.message });
+        // Transfer fee to ride owner and refund remaining
+        try {
+            const passenger = db.prepare(`SELECT sawaari_wallet FROM users WHERE id = ?`).get(userId);
+            const paidAmount = fare;
+            const fee = paidAmount * feePct;
+            const refund = paidAmount - fee;
+
+            if (fee > 0) {
+                db.prepare(`UPDATE users SET sawaari_wallet = sawaari_wallet - ? WHERE id = ?`).run(fee, userId);
+                db.prepare(`UPDATE users SET sawaari_wallet = sawaari_wallet + ? WHERE id = ?`).run(fee, ride.user_id);
+                try {
+                    db.prepare(`INSERT INTO wallet_transactions (user_id, type, amount, description, ride_id) VALUES (?, 'debit', ?, ?, ?)`)
+                        .run(userId, fee, `Cancellation fee (${(feePct * 100).toFixed(0)}%) — ride ${ride.source} → ${ride.destination}`, rideId);
+                    db.prepare(`INSERT INTO wallet_transactions (user_id, type, amount, description, ride_id) VALUES (?, 'credit', ?, ?, ?)`)
+                        .run(ride.user_id, fee, `Cancellation fee received — ride ${ride.source} → ${ride.destination}`, rideId);
+                } catch (_) { }
             }
+            if (refund > 0) {
+                db.prepare(`UPDATE users SET sawaari_wallet = sawaari_wallet + ? WHERE id = ?`).run(refund, userId);
+                try {
+                    db.prepare(`INSERT INTO wallet_transactions (user_id, type, amount, description, ride_id) VALUES (?, 'credit', ?, ?, ?)`)
+                        .run(userId, refund, `Refund after cancellation fee — ride ${ride.source} → ${ride.destination}`, rideId);
+                } catch (_) { }
+            }
+        } catch (walletErr) {
+            console.error('Cancellation wallet error:', walletErr);
+            // Still allow cancel even if wallet fails
         }
 
         // Remove from ride_members
-        db.prepare(`DELETE FROM ride_members WHERE ride_id = ? AND user_id = ?`).run(rideId, req.user.userId);
-
-        // Update request status
-        db.prepare(`UPDATE ride_requests SET status = 'cancelled' WHERE ride_id = ? AND requester_id = ?`).run(rideId, req.user.userId);
+        db.prepare(`DELETE FROM ride_members WHERE ride_id = ? AND user_id = ?`).run(rideId, userId);
+        db.prepare(`UPDATE ride_requests SET status = 'cancelled' WHERE ride_id = ? AND requester_id = ?`).run(rideId, userId);
 
         // Notify owner
         try {
-            const leaver = db.prepare(`SELECT username FROM users WHERE id = ?`).get(req.user.userId);
             db.prepare(`INSERT INTO notifications (user_id, type, message, ride_id) VALUES (?, 'passenger_left', ?, ?)`)
-                .run(ride.user_id, `${leaver.username} left your ride from ${ride.source} → ${ride.destination}. Cancellation fee ₩${feeAmount} credited to your wallet.`, rideId);
+                .run(ride.user_id, `${leaver.username} left your ride from ${ride.source} → ${ride.destination}.${feeAmount > 0 ? ` ₩${feeAmount} cancellation fee credited to your wallet.` : ''}`, rideId);
         } catch (_) { }
 
         res.json({
             success: true,
             fee_percent: feePct * 100,
             fee_amount: feeAmount,
+            refund_amount: refundAmount,
             message: feeAmount > 0 ? `Left ride. ₩${feeAmount} cancellation fee charged.` : 'Left ride. No fee — cancelled more than 24h before departure.',
         });
     } catch (err) {

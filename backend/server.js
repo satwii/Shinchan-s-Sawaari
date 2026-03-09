@@ -25,14 +25,20 @@ const ALLOWED_ORIGINS = [
 // Shared CORS options — used for both the middleware and OPTIONS preflight
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (Postman, mobile apps, curl)
         if (!origin) return callback(null, true);
-        // Allow anything in the explicit list
-        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-        // Also allow any *.onrender.com or *.azurewebsites.net subdomain dynamically
-        if (/\.onrender\.com$/.test(origin)) return callback(null, true);
-        if (/\.azurewebsites\.net$/.test(origin)) return callback(null, true);
-        callback(new Error('CORS not allowed for: ' + origin));
+
+        if (
+            ALLOWED_ORIGINS.includes(origin) ||
+            /\.onrender\.com$/.test(origin) ||
+            /\.azurewebsites\.net$/.test(origin)
+        ) {
+            return callback(null, true);
+        }
+
+        console.log("Blocked CORS origin:", origin);
+
+        // instead of throwing error, deny quietly
+        return callback(null, false);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

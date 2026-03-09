@@ -81,7 +81,7 @@ export default function DriverTrips() {
                                 <p className="text-sawaari-muted text-[10px] mt-0.5">Seats Left</p>
                             </div>
                             <div className="text-center bg-sawaari-dark/50 rounded-xl p-2">
-                                <p className="text-white font-semibold">₹{trip.price_per_seat}</p>
+                                <p className="text-white font-semibold">₩{trip.price_per_seat}</p>
                                 <p className="text-sawaari-muted text-[10px] mt-0.5">Per Seat</p>
                             </div>
                             <div className="text-center bg-sawaari-dark/50 rounded-xl p-2">

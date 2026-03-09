@@ -319,6 +319,10 @@ export default function RideDetailPage() {
         return (dep - Date.now()) / 3600000;
     }
     function getCancelFeeInfo() {
+        // Fix 1: FareShare cancellations are ALWAYS FREE
+        if (ride?.type === 'fareshare') {
+            return { pct: 0, label: '✅ FareShare rides have no cancellation fee — full refund guaranteed' };
+        }
         const h = hoursUntilRide();
         if (cancelType === 'cancel') {
             // Owner cancels
@@ -413,6 +417,18 @@ export default function RideDetailPage() {
 
             setSosData(alert);
             setSosTriggered(true);
+
+            // Fix 7: Also call backend POST /api/sos to notify co-riders via notifications
+            try {
+                await api.post('/sos', {
+                    ride_id: parseInt(id),
+                    lat: loc?.lat || null,
+                    lng: loc?.lng || null,
+                    message: `SOS from ${alert.userName} on ride ${alert.source} → ${alert.destination}`,
+                });
+            } catch (sosErr) {
+                console.warn('SOS backend notify failed (non-fatal):', sosErr.message);
+            }
 
             console.log(`\n🚨 [SOS ALERT TRIGGERED]`);
             console.log(`   User: ${alert.userName}`);
@@ -896,7 +912,9 @@ export default function RideDetailPage() {
                             </div>
 
                             <p className="text-sawaari-muted text-[10px] text-center">
-                                ⚠️ Free cancellation available more than 24 hours before departure
+                                {ride?.type === 'fareshare'
+                                    ? '🎉 FareShare: 100% refund guaranteed — no cancellation fee ever'
+                                    : '⚠️ Free cancellation available more than 24 hours before departure'}
                             </p>
                         </div>
                     </div>
@@ -960,13 +978,6 @@ export default function RideDetailPage() {
                 </div>
             )}
 
-            {/* SOS Floating Button */}
-            {isMember && !ride?.trip_completed && (
-                <button onClick={triggerSOS}
-                    className="fixed bottom-6 right-6 z-40 w-16 h-16 rounded-full bg-red-600 shadow-2xl shadow-red-600/50 flex items-center justify-center text-white font-black text-sm animate-pulse hover:bg-red-700 active:scale-90 transition-all border-2 border-red-400">
-                    SOS
-                </button>
-            )}
         </div>
     );
 }

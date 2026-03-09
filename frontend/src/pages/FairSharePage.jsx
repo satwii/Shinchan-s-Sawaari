@@ -55,7 +55,14 @@ export default function FairSharePage() {
                 sourceLat, sourceLng,
                 destinationLat, destinationLng,
             });
-            setRides(res.data.rides || []);
+            // Fix 2: Client-side filter – exclude rides whose departure has already passed
+            const now = new Date();
+            const upcoming = (res.data.rides || []).filter(r => {
+                if (!r.date || !r.ride_time) return true; // keep if no time info
+                const dep = new Date(`${r.date}T${r.ride_time}:00`);
+                return dep > now;
+            });
+            setRides(upcoming);
             setSearchDone(true);
         } catch (err) {
             setMsg(err.response?.data?.error || 'Search failed');
@@ -209,9 +216,9 @@ export default function FairSharePage() {
 
                                 {rides.length === 0 ? (
                                     <div className="card text-center py-10">
-                                        <div className="text-5xl mb-3">🔍</div>
-                                        <p className="text-white font-medium mb-1">No rides found</p>
-                                        <p className="text-sawaari-muted text-sm mb-4">Try a different route or date</p>
+                                        <div className="text-5xl mb-3">🚗</div>
+                                        <p className="text-white font-medium mb-1">No rides found on this route yet</p>
+                                        <p className="text-sawaari-muted text-sm mb-4">Be the first to share!</p>
                                         <button onClick={() => setShowModal(true)}
                                             className="btn-primary inline-flex items-center gap-2">
                                             + Register Your Own
@@ -267,14 +274,23 @@ export default function FairSharePage() {
                                 )}
 
                                 {/* Upcoming Rides */}
-                                {myRides.filter(r => !r.trip_started && !r.trip_completed).length > 0 && (
-                                    <div>
-                                        <h3 className="text-sawaari-muted text-xs font-semibold uppercase tracking-wide mb-2">Upcoming</h3>
-                                        {myRides.filter(r => !r.trip_started && !r.trip_completed).map(ride => (
-                                            <MyRideCard key={ride.id} ride={ride} />
-                                        ))}
-                                    </div>
-                                )}
+                                {(() => {
+                                    const now = new Date();
+                                    const upcomingRides = myRides.filter(r => {
+                                        if (r.trip_started || r.trip_completed) return false;
+                                        if (!r.date || !r.ride_time) return true;
+                                        const dep = new Date(`${r.date}T${r.ride_time}:00`);
+                                        return dep > now;
+                                    });
+                                    return upcomingRides.length > 0 && (
+                                        <div>
+                                            <h3 className="text-sawaari-muted text-xs font-semibold uppercase tracking-wide mb-2">Upcoming</h3>
+                                            {upcomingRides.map(ride => (
+                                                <MyRideCard key={ride.id} ride={ride} />
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* Completed Rides */}
                                 {myRides.filter(r => r.trip_completed).length > 0 && (
