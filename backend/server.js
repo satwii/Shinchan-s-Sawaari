@@ -22,8 +22,8 @@ const ALLOWED_ORIGINS = [
     'http://127.0.0.1:3000',
 ];
 
-// ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
-app.use(cors({
+// Shared CORS options — used for both the middleware and OPTIONS preflight
+const corsOptions = {
     origin: (origin, callback) => {
         // Allow requests with no origin (Postman, mobile apps, curl)
         if (!origin) return callback(null, true);
@@ -35,10 +35,14 @@ app.use(cors({
         callback(new Error('CORS not allowed for: ' + origin));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
-}));
-// Handle OPTIONS preflight for all routes (required for CORS in production)
-app.options('*', cors());
+};
+
+// ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
+// Handle OPTIONS preflight BEFORE other middleware so it always responds correctly
+app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // ─── SOCKET.IO ────────────────────────────────────────────────────────────────
