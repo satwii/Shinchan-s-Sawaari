@@ -106,7 +106,7 @@ export default function MyBookings() {
                             <div className="bg-sawaari-dark/50 rounded-xl p-2 text-center">
                                 {b.payment_status ? (
                                     <>
-                                        <p className="text-emerald-400 text-sm font-semibold">₩{b.amount}</p>
+                                        <p className="text-emerald-400 text-sm font-semibold">₹{b.amount}</p>
                                         <p className="text-sawaari-muted text-[10px] mt-0.5">{b.payment_mode}</p>
                                     </>
                                 ) : (
@@ -181,11 +181,11 @@ export default function MyBookings() {
                                 <>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-sawaari-muted">Cancellation fee ({fmt(cancelSummary.fee_percent)}%)</span>
-                                        <span className="text-red-400 font-bold">-₩{fmt(cancelSummary.fee_amount)}</span>
+                                        <span className="text-red-400 font-bold">-₹{fmt(cancelSummary.fee_amount)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-sawaari-muted">Sent to ride owner</span>
-                                        <span className="text-orange-400">₩{fmt(cancelSummary.fee_amount)}</span>
+                                        <span className="text-orange-400">₹{fmt(cancelSummary.fee_amount)}</span>
                                     </div>
                                     <div className="border-t border-sawaari-border pt-2 mt-2">
                                         <p className="text-xs text-sawaari-muted text-center">{cancelSummary.message}</p>

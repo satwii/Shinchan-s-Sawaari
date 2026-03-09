@@ -80,7 +80,7 @@ router.get('/trips', authenticateToken, (req, res) => {
         autoCompletePastTrips(db);
         cancelExpiredBookings(db);
 
-        const { source, destination, pink_mode } = req.query;
+        const { source, destination, pink_mode, source_lat, source_lng, dest_lat, dest_lng } = req.query;
         const userGender = req.user.gender;
 
         let query = `
@@ -97,19 +97,10 @@ router.get('/trips', authenticateToken, (req, res) => {
     `;
         const params = [];
 
-        if (source && destination) {
-            query += ` AND (LOWER(t.source) LIKE LOWER('%' || ? || '%') OR LOWER(?) LIKE LOWER('%' || t.source || '%'))
-                      AND (LOWER(t.destination) LIKE LOWER('%' || ? || '%') OR LOWER(?) LIKE LOWER('%' || t.destination || '%'))`;
-            params.push(source, source, destination, destination);
-        }
-
         // Pink mode filtering:
-        // If pink_mode=true requested: show ONLY pink trips (and only if user is Female)
-        // If pink_mode not requested: hide pink trips from non-Female users
         if (pink_mode === 'true' || pink_mode === '1') {
             query += ` AND t.pink_mode = 1`;
         } else if (userGender !== 'Female') {
-            // Non-female users don't see pink-only trips (unless they created them)
             query += ` AND (t.pink_mode = 0 OR v.driver_id = ?)`;
             params.push(req.user.userId);
         }
@@ -117,7 +108,45 @@ router.get('/trips', authenticateToken, (req, res) => {
         query += ` ORDER BY t.trip_date ASC, t.trip_time ASC`;
 
         const trips = db.prepare(query).all(...params);
-        res.json({ trips });
+
+        // ── En-route / coordinate matching ──────────────────────────────────
+        const srcLat = parseFloat(source_lat);
+        const srcLng = parseFloat(source_lng);
+        const dstLat = parseFloat(dest_lat);
+        const dstLng = parseFloat(dest_lng);
+        const hasCoords = !isNaN(srcLat) && !isNaN(srcLng) && !isNaN(dstLat) && !isNaN(dstLng);
+        const MATCH_KM = 5;
+
+        function haversineKm(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const toRad = d => d * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        const filtered = trips.filter(trip => {
+            // ─ Coordinate-based match (preferred) ──────────────────────────
+            if (hasCoords && trip.source_lat && trip.source_lng && trip.dest_lat && trip.dest_lng) {
+                const srcDist = haversineKm(srcLat, srcLng, trip.source_lat, trip.source_lng);
+                const dstDist = haversineKm(dstLat, dstLng, trip.dest_lat, trip.dest_lng);
+                return srcDist <= MATCH_KM && dstDist <= MATCH_KM;
+            }
+
+            // ─ String-based fallback ───────────────────────────────────────
+            if (!source && !destination) return true; // no filter requested
+            const ts = (trip.source || '').toLowerCase();
+            const td = (trip.destination || '').toLowerCase();
+            const qs = (source || '').toLowerCase().trim();
+            const qd = (destination || '').toLowerCase().trim();
+            const srcMatch = !qs || ts.includes(qs) || qs.includes(ts);
+            const dstMatch = !qd || td.includes(qd) || qd.includes(td);
+            return srcMatch && dstMatch;
+        });
+
+        res.json({ trips: filtered });
     } catch (err) {
         console.error('Get trips error:', err);
         res.status(500).json({ error: 'Failed to fetch trips' });
@@ -481,13 +510,13 @@ router.put('/rider/bookings/:id/cancel', authenticateToken, (req, res) => {
             db.prepare(`INSERT INTO notifications (user_id, type, message) VALUES (?, 'passenger_left', ?)`)
                 .run(booking.driver_id,
                     cancellationFee > 0
-                        ? `A passenger cancelled their booking. You received ₩${cancellationFee.toFixed(0)} as cancellation fee.`
+                        ? `A passenger cancelled their booking. You received ₹${cancellationFee.toFixed(0)} as cancellation fee.`
                         : 'A passenger cancelled their booking (no fee — more than 24h before departure).'
                 );
         } catch (_) { }
 
         const feeMsg = cancellationFee > 0
-            ? `Cancellation fee (${(feePercent * 100).toFixed(0)}%): ₩${cancellationFee.toFixed(0)} deducted from your wallet.`
+            ? `Cancellation fee (${(feePercent * 100).toFixed(0)}%): ₹${cancellationFee.toFixed(0)} deducted from your wallet.`
             : 'No cancellation fee — cancelled more than 24 hours before departure.';
 
         res.json({

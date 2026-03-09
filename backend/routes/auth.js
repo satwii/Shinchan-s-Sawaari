@@ -281,14 +281,14 @@ router.post('/register', (req, res) => {
 
         const newUser = db.prepare(`SELECT * FROM users WHERE id = ?`).get(existingUser.id);
 
-        // ── ₩1000 Welcome Bonus ───────────────────────────────────────────────
+        // ── ₹1000 Welcome Bonus ───────────────────────────────────────────────
         try {
             const currentWallet = newUser.sawaari_wallet || 0;
             const bonusBalance = currentWallet + 1000;
             db.prepare(`UPDATE users SET sawaari_wallet = ? WHERE id = ?`).run(bonusBalance, newUser.id);
             db.prepare(`
                 INSERT INTO wallet_transactions (user_id, type, amount, balance_after, description)
-                VALUES (?, 'welcome_bonus', 1000, ?, 'Welcome to Sawaari! ₩1000 bonus added to your wallet 🎉')
+                VALUES (?, 'welcome_bonus', 1000, ?, 'Welcome to Sawaari! ₹1000 bonus added to your wallet 🎉')
             `).run(newUser.id, bonusBalance);
         } catch (walletErr) {
             console.error('Welcome bonus error (non-fatal):', walletErr);

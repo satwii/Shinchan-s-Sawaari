@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import LocationAutocomplete from './LocationAutocomplete';
-import FareCard from './FareCard';
 
 export default function RegisterRideModal({ isOpen, onClose, onRegistered }) {
     const { user } = useAuth();
@@ -24,7 +23,6 @@ export default function RegisterRideModal({ isOpen, onClose, onRegistered }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [step, setStep] = useState(1);
-    const [calculatedFare, setCalculatedFare] = useState(null);
 
     if (!isOpen) return null;
 
@@ -69,7 +67,6 @@ export default function RegisterRideModal({ isOpen, onClose, onRegistered }) {
                 sourceLng: form.sourceLng,
                 destinationLat: form.destinationLat,
                 destinationLng: form.destinationLng,
-                calculatedFare: calculatedFare,
             });
 
             onRegistered?.(res.data.ride);
@@ -204,16 +201,22 @@ export default function RegisterRideModal({ isOpen, onClose, onRegistered }) {
                                 </div>
                             </div>
 
-                            {/* Sawaari Fare Card */}
-                            <FareCard
-                                sourceLat={form.sourceLat}
-                                sourceLng={form.sourceLng}
-                                destLat={form.destinationLat}
-                                destLng={form.destinationLng}
-                                vehicleType={form.vehicleType}
-                                seats={form.seatsAvailable}
-                                onFareReady={setCalculatedFare}
-                            />
+                            {/* FairShare: fare is split from actual cab bill — no calculation needed */}
+                            <div style={{
+                                background: 'rgba(16,185,129,0.07)',
+                                border: '1px solid rgba(16,185,129,0.2)',
+                                borderRadius: 12,
+                                padding: '10px 14px',
+                                marginTop: 8,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                            }}>
+                                <span style={{ fontSize: 16 }}>🤝</span>
+                                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+                                    Split fare equally among co-passengers from the actual cab receipt.
+                                </span>
+                            </div>
 
                             {/* Passenger counts */}
                             <div className="grid grid-cols-2 gap-3">

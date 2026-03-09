@@ -9,7 +9,7 @@ function transferWallet(db, fromUserId, toUserId, amount, rideId, description) {
         // Debit sender
         const sender = db.prepare(`SELECT sawaari_wallet FROM users WHERE id = ?`).get(fromUserId);
         if (!sender || sender.sawaari_wallet < amount) {
-            throw new Error(`Insufficient Sawaari Money. Need ₩${amount.toFixed(0)}, have ₩${(sender?.sawaari_wallet || 0).toFixed(0)}`);
+            throw new Error(`Insufficient Sawaari Money. Need ₹${amount.toFixed(0)}, have ₹${(sender?.sawaari_wallet || 0).toFixed(0)}`);
         }
         const senderNewBal = parseFloat((sender.sawaari_wallet - amount).toFixed(2));
         db.prepare(`UPDATE users SET sawaari_wallet = ? WHERE id = ?`).run(senderNewBal, fromUserId);
@@ -58,7 +58,7 @@ router.post('/add-money', authenticateToken, (req, res) => {
         const { amount } = req.body;
         const amt = parseFloat(amount);
         if (!amt || amt <= 0 || amt > 50000) {
-            return res.status(400).json({ error: 'Amount must be between ₩1 and ₩50,000' });
+            return res.status(400).json({ error: 'Amount must be between ₹1 and ₹50,000' });
         }
 
         const db = getDb();

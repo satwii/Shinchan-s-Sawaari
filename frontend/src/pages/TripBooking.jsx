@@ -111,7 +111,7 @@ export default function TripBooking() {
                             <p className="text-sawaari-muted text-xs mt-0.5">Seats Left</p>
                         </div>
                         <div className="bg-sawaari-dark/50 rounded-xl p-3 text-center">
-                            <p className="text-white font-bold">₩{trip.price_per_seat}</p>
+                            <p className="text-white font-bold">₹{trip.price_per_seat}</p>
                             <p className="text-sawaari-muted text-xs mt-0.5">Per Seat</p>
                         </div>
                     </div>
@@ -135,8 +135,8 @@ export default function TripBooking() {
 
                         {trip.price_per_seat > 0 && (
                             <div className="flex items-center justify-between bg-sawaari-dark/50 rounded-xl p-4">
-                                <span className="text-sawaari-muted text-sm">{seats} seat{seats > 1 ? 's' : ''} × ₩{trip.price_per_seat}</span>
-                                <span className="text-white font-bold text-lg">₩{total}</span>
+                                <span className="text-sawaari-muted text-sm">{seats} seat{seats > 1 ? 's' : ''} × ₹{trip.price_per_seat}</span>
+                                <span className="text-white font-bold text-lg">₹{total}</span>
                             </div>
                         )}
 
@@ -189,10 +189,10 @@ export default function TripBooking() {
                             {trip.price_per_seat > 0 && (
                                 <>
                                     <div className="flex justify-between text-sm text-sawaari-muted mb-1">
-                                        <span>Price per seat</span><span className="text-white">₩{trip.price_per_seat}</span>
+                                        <span>Price per seat</span><span className="text-white">₹{trip.price_per_seat}</span>
                                     </div>
                                     <div className="border-t border-sawaari-border mt-2 pt-2 flex justify-between font-bold">
-                                        <span className="text-white">Total</span><span className="text-primary-400 text-lg">₩{total}</span>
+                                        <span className="text-white">Total</span><span className="text-primary-400 text-lg">₹{total}</span>
                                     </div>
                                 </>
                             )}
@@ -217,7 +217,7 @@ export default function TripBooking() {
 
                         <button onClick={handlePay} disabled={paying || timeLeft <= 0}
                             className="btn-primary w-full py-4 text-base">
-                            {paying ? 'Processing...' : trip.price_per_seat > 0 ? `Pay ₩${total} Now` : 'Confirm Booking'}
+                            {paying ? 'Processing...' : trip.price_per_seat > 0 ? `Pay ₹${total} Now` : 'Confirm Booking'}
                         </button>
                     </div>
                 )}

@@ -187,16 +187,48 @@ app.use((err, req, res, next) => {
 // ─── POST /api/sos ─────────────────────────────────────────────────────
 app.post('/api/sos', authenticateToken, (req, res) => {
     try {
-        const { ride_id, lat, lng, message } = req.body;
+        const { lat, lng, message, ride_id } = req.body;
         const db = getDb();
         const userId = req.user.userId;
 
-        console.log(`\n🚨 [SOS TRIGGERED] User ${userId} | Ride ${ride_id} | Lat ${lat} Lng ${lng} | ${new Date().toISOString()}`);
+        // Ensure sos_alerts table exists
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS sos_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                user_name TEXT,
+                user_phone TEXT,
+                lat REAL,
+                lng REAL,
+                triggered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'active',
+                resolved_at DATETIME
+            )
+        `);
 
-        // Get user emergency contact
-        const user = db.prepare(`SELECT username, emergency_contact_name, emergency_contact_phone FROM users WHERE id = ?`).get(userId);
+        const user = db.prepare(`SELECT username, phone, emergency_contact_name, emergency_contact_phone FROM users WHERE id = ?`).get(userId);
+        const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : 'Location unavailable';
 
-        // Get all ride members to notify
+        // Log to DB
+        const alertResult = db.prepare(`
+            INSERT INTO sos_alerts (user_id, user_name, user_phone, lat, lng)
+            VALUES (?, ?, ?, ?, ?)
+        `).run(userId, user?.username, user?.phone, lat || null, lng || null);
+
+        // Simulate police alert (console only — prototype)
+        console.log(`\n🚨 POLICE ALERT (simulated):`);
+        console.log(`   User    : ${user?.username} | Phone: ${user?.phone}`);
+        console.log(`   Location: ${lat}, ${lng}`);
+        console.log(`   Maps    : ${mapsLink}`);
+        console.log(`   Message : I am in danger. Please help immediately.`);
+
+        // Simulate emergency contact alert
+        console.log(`\n📱 EMERGENCY CONTACT ALERT (simulated):`);
+        console.log(`   Calling : ${user?.emergency_contact_name}`);
+        console.log(`   Number  : ${user?.emergency_contact_phone}`);
+        console.log(`   SMS     : "${user?.username} has triggered an SOS on Sawaari. Location: ${mapsLink}. Please check on them immediately or call 112."`);
+
+        // Get ride members to notify (if ride_id provided)
         if (ride_id) {
             const members = db.prepare(`SELECT user_id FROM ride_members WHERE ride_id = ? AND user_id != ?`).all(ride_id, userId);
             for (const m of members) {
@@ -207,15 +239,52 @@ app.post('/api/sos', authenticateToken, (req, res) => {
             }
         }
 
-        console.log(`   Emergency Contact: ${user?.emergency_contact_name} (${user?.emergency_contact_phone})`);
-        console.log(`   Location: https://maps.google.com/?q=${lat},${lng}`);
+        // Confirm SOS notification to the user themselves
+        try {
+            db.prepare(`INSERT INTO notifications (user_id, type, message) VALUES (?, 'sos_confirmed', ?)`)
+                .run(userId, 'SOS activated. Emergency contact and police notified. Help is on the way.');
+        } catch (_) { }
 
-        res.json({ success: true, message: 'SOS triggered. Help is on the way.' });
+        res.json({
+            success: true,
+            policeAlerted: true,
+            contactAlerted: true,
+            contactName: user?.emergency_contact_name || null,
+            contactPhone: user?.emergency_contact_phone || null,
+            mapsLink,
+            sosId: alertResult.lastInsertRowid,
+            message: 'SOS sent. Help is on the way.',
+        });
     } catch (err) {
         console.error('SOS error:', err);
         res.status(500).json({ error: 'SOS failed' });
     }
 });
+
+// ─── POST /api/sos/resolve ──────────────────────────────────────────────────
+app.post('/api/sos/resolve', authenticateToken, (req, res) => {
+    try {
+        const { sos_id } = req.body;
+        const db = getDb();
+
+        db.exec(`CREATE TABLE IF NOT EXISTS sos_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, user_name TEXT,
+            user_phone TEXT, lat REAL, lng REAL, triggered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'active', resolved_at DATETIME
+        )`);
+
+        if (sos_id) {
+            db.prepare(`UPDATE sos_alerts SET status = 'resolved', resolved_at = datetime('now') WHERE id = ? AND user_id = ?`)
+                .run(sos_id, req.user.userId);
+        }
+
+        res.json({ success: true, message: 'SOS resolved. Stay safe!' });
+    } catch (err) {
+        console.error('SOS resolve error:', err);
+        res.status(500).json({ error: 'Failed to resolve SOS' });
+    }
+});
+
 
 // ─── EXPIRED RIDES CLEANUP JOB (Fix 2) ────────────────────────────────────
 function markExpiredRides() {

@@ -881,12 +881,12 @@ export default function RideDetailPage() {
                                         <>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-sawaari-muted">Cancellation fee ({feeInfo.pct}%)</span>
-                                                <span className="text-red-400 font-bold">₩{feeAmt.toFixed(0)}</span>
+                                                <span className="text-red-400 font-bold">₹{feeAmt.toFixed(0)}</span>
                                             </div>
                                             {cancelType === 'leave' && (
                                                 <div className="flex justify-between text-sm mt-1">
                                                     <span className="text-sawaari-muted">Goes to ride owner</span>
-                                                    <span className="text-orange-400">₩{feeAmt.toFixed(0)}</span>
+                                                    <span className="text-orange-400">₹{feeAmt.toFixed(0)}</span>
                                                 </div>
                                             )}
                                         </>
@@ -946,12 +946,12 @@ export default function RideDetailPage() {
                                 <>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-sawaari-muted">Cancellation fee ({cancelResult.fee_percent?.toFixed(0)}%)</span>
-                                        <span className="text-red-400 font-bold">-₩{Number(cancelResult.fee_amount).toFixed(0)}</span>
+                                        <span className="text-red-400 font-bold">-₹{Number(cancelResult.fee_amount).toFixed(0)}</span>
                                     </div>
                                     {cancelType === 'leave' && (
                                         <div className="flex justify-between text-sm">
                                             <span className="text-sawaari-muted">Sent to ride owner</span>
-                                            <span className="text-orange-400">₩{Number(cancelResult.fee_amount).toFixed(0)}</span>
+                                            <span className="text-orange-400">₹{Number(cancelResult.fee_amount).toFixed(0)}</span>
                                         </div>
                                     )}
                                 </>

@@ -27,6 +27,12 @@ export default function RiderDashboard() {
         try {
             const params = { source, destination };
             if (pinkMode) params.pink_mode = 'true';
+            // Pass coordinates if available (enables precise en-route matching)
+            if (sourceLat) params.source_lat = sourceLat;
+            if (sourceLng) params.source_lng = sourceLng;
+            if (destLat) params.dest_lat = destLat;
+            if (destLng) params.dest_lng = destLng;
+            console.log('🔍 DriveShare search params:', params);
             const res = await api.get('/ts/trips', { params });
             setTrips(res.data.trips || []);
         } catch (err) {
@@ -168,7 +174,7 @@ function TripCard({ trip, pinkMode, onSelect }) {
             <div className="grid grid-cols-4 gap-2 mb-4">
                 <InfoCell label="Driver" value={trip.driver_name} />
                 <InfoCell label="Seats" value={`${trip.available_seats} left`} />
-                <InfoCell label="Price" value={trip.price_per_seat > 0 ? `₩${trip.price_per_seat}` : 'Free'} />
+                <InfoCell label="Price" value={trip.price_per_seat > 0 ? `₹${trip.price_per_seat}` : 'Free'} />
                 <InfoCell label="Vehicle" value={trip.vehicle_type || trip.model} />
             </div>
 
@@ -180,7 +186,7 @@ function TripCard({ trip, pinkMode, onSelect }) {
                             ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg shadow-pink-500/20 hover:shadow-pink-500/40'
                             : 'btn-primary'
                     }`}>
-                {trip.status_name === 'Full' ? 'No Seats Available' : `Book Seat${trip.price_per_seat > 0 ? ` — ₩${trip.price_per_seat}/seat` : ''}`}
+                {trip.status_name === 'Full' ? 'No Seats Available' : `Book Seat${trip.price_per_seat > 0 ? ` — ₹${trip.price_per_seat}/seat` : ''}`}
             </button>
         </div>
     );

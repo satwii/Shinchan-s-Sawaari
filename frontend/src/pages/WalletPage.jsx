@@ -43,7 +43,7 @@ export default function WalletPage() {
             await new Promise(r => setTimeout(r, 1200));
             const res = await api.post('/wallet/add-money', { amount: amt });
             setBalance(res.data.balance);
-            setAddMsg(`✅ ₩${fmt(amt)} added successfully!`);
+            setAddMsg(`✅ ₹${fmt(amt)} added successfully!`);
             setAddAmount('');
             fetchWallet();
             setTimeout(() => { setShowAdd(false); setAddMsg(''); }, 2000);
@@ -68,7 +68,7 @@ export default function WalletPage() {
                     <button onClick={() => navigate('/home')} className="text-sawaari-muted hover:text-white transition-colors">←</button>
                     <div>
                         <span className="text-xs text-sawaari-muted block">Sawaari</span>
-                        <span className="text-white font-bold text-sm">💰 Sawaari Money</span>
+                        <span className="text-white font-bold text-sm">💰 Sawaari Money (₹)</span>
                     </div>
                 </div>
             </header>
@@ -87,7 +87,7 @@ export default function WalletPage() {
                             <div className="px-6 pt-6 pb-4">
                                 <p className="text-sawaari-muted text-xs mb-1 uppercase tracking-widest">Sawaari Money Balance</p>
                                 <div className="flex items-end gap-2">
-                                    <span className="text-4xl font-black text-white">₩</span>
+                                    <span className="text-4xl font-black text-white">₹</span>
                                     <span className="text-5xl font-black text-white">{fmt(balance)}</span>
                                 </div>
                                 <p className="text-purple-300/60 text-xs mt-3">
@@ -116,12 +116,12 @@ export default function WalletPage() {
                         <div className="card text-sm space-y-2">
                             <h3 className="text-white font-semibold">💡 About Sawaari Money</h3>
                             <p className="text-sawaari-muted text-xs leading-relaxed">
-                                Sawaari Money (₩) is used for all ride payments, cancellation fees, and driver compensation within the app.
-                                New users receive ₩1,000 as a welcome bonus.
+                                Sawaari Money (₹) is used for all ride payments, cancellation fees, and driver compensation within the app.
+                                New users receive ₹1,000 as a welcome bonus.
                             </p>
                             <div className="grid grid-cols-2 gap-2 mt-2">
                                 {[
-                                    { icon: '🎁', label: 'Welcome Bonus', val: '₩1,000' },
+                                    { icon: '🎁', label: 'Welcome Bonus', val: '₹1,000' },
                                     { icon: '✅', label: 'Free Cancel', val: '>24h before' },
                                     { icon: '⚠️', label: 'Late Cancel', val: 'Up to 75% fee' },
                                     { icon: '🔄', label: 'Convert to', val: 'UPI / Bank' },
@@ -157,9 +157,9 @@ export default function WalletPage() {
                                             </div>
                                             <div className="text-right flex-shrink-0">
                                                 <p className={`font-bold text-sm ${tx.type === 'credit' || tx.type === 'welcome_bonus' || tx.type === 'cancellation_refund' || tx.type === 'ride_earning' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                    {tx.type === 'credit' || tx.type === 'welcome_bonus' || tx.type === 'cancellation_refund' || tx.type === 'ride_earning' ? '+' : '-'}₩{fmt(tx.amount)}
+                                                    {tx.type === 'credit' || tx.type === 'welcome_bonus' || tx.type === 'cancellation_refund' || tx.type === 'ride_earning' ? '+' : '-'}₹{fmt(tx.amount)}
                                                 </p>
-                                                <p className="text-sawaari-muted text-[10px] mt-0.5">Bal: ₩{fmt(tx.balance_after)}</p>
+                                                <p className="text-sawaari-muted text-[10px] mt-0.5">Bal: ₹{fmt(tx.balance_after)}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -183,7 +183,7 @@ export default function WalletPage() {
 
                         <form onSubmit={handleAddMoney} className="space-y-4">
                             <div>
-                                <label className="label">Amount (₩)</label>
+                                <label className="label">Amount (₹)</label>
                                 <input
                                     type="number" min="1" max="50000" step="100"
                                     value={addAmount}
@@ -200,7 +200,7 @@ export default function WalletPage() {
                                     <button key={amt} type="button" onClick={() => setAddAmount(String(amt))}
                                         className={`py-2 rounded-xl border text-sm font-semibold transition-all
                                             ${addAmount === String(amt) ? 'bg-primary-500 border-primary-400 text-white' : 'border-sawaari-border text-sawaari-muted hover:text-white'}`}>
-                                        ₩{amt}
+                                        ₹{amt}
                                     </button>
                                 ))}
                             </div>
@@ -218,7 +218,7 @@ export default function WalletPage() {
                                         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                         Processing via UPI...
                                     </span>
-                                ) : `Pay ₩${addAmount || '0'} via UPI / Bank`}
+                                ) : `Pay ₹${addAmount || '0'} via UPI / Bank`}
                             </button>
                             <p className="text-sawaari-muted text-[10px] text-center">
                                 🔒 In production, this connects to your UPI app. This is a prototype simulation.

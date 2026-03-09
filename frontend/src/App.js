@@ -14,6 +14,8 @@ import DriveShareEntry from './pages/DriveShareEntry';
 import DriverDashboard from './pages/DriverDashboard';
 import RiderDashboard from './pages/RiderDashboard';
 import SawaariAI from './components/SawaariAI';
+import GlobalSOSButton from './components/GlobalSOSButton';
+
 
 // Lazy-load optional sub-pages (they may or may not exist)
 let CreateTrip, DriverTrips, DriverBookings, TripBooking, MyBookings, WalletPage;
@@ -109,6 +111,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <SawaariAI />
+        <GlobalSOSButton />
       </Router>
     </AuthProvider>
   );

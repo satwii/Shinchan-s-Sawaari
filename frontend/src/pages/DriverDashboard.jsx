@@ -40,7 +40,7 @@ export default function DriverDashboard() {
                 <div className="grid grid-cols-2 gap-4">
                     <div className="card bg-gradient-to-br from-emerald-600/20 to-teal-600/10 border-emerald-500/20 text-center">
                         <p className="text-sawaari-muted text-xs mb-1">Total Earnings</p>
-                        <p className="text-white text-2xl font-bold">₩{stats?.earnings?.toFixed(2) || '0.00'}</p>
+                        <p className="text-white text-2xl font-bold">₹{stats?.earnings?.toFixed(2) || '0.00'}</p>
                     </div>
                     <div className="card bg-gradient-to-br from-primary-600/20 to-pink-600/10 border-primary-500/20 text-center">
                         <p className="text-sawaari-muted text-xs mb-1">Active Trips</p>

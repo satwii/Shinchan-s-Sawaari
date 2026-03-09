@@ -9,13 +9,33 @@ const groq = new OpenAI({
     baseURL: 'https://api.groq.com/openai/v1',
 });
 
-function getSystemPrompt() {
+function getSystemPrompt(detectedLanguage) {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().slice(0, 5);
-    return `You are Sawaari AI, a helpful ride-sharing assistant for the Sawaari app — a hyperlocal cab-sharing and carpooling platform in India. You help users in their native language.
+
+    const langName = {
+        'ta-IN': 'Tamil (தமிழ்)',
+        'te-IN': 'Telugu (తెలుగు)',
+        'ml-IN': 'Malayalam (മലയാളം)',
+        'hi-IN': 'Hindi (हिंदी)',
+        'en-IN': 'English',
+    }[detectedLanguage || 'en-IN'] || 'English';
+
+    return `You are Sawaari AI, a helpful ride-sharing assistant for the Sawaari app — a hyperlocal cab-sharing and carpooling platform in India.
 
 Today's date is ${dateStr} and current time is ${timeStr}.
+
+🌐 CRITICAL LANGUAGE RULE — READ CAREFULLY:
+The user is communicating in: ${detectedLanguage || 'en-IN'} (${langName})
+You MUST write your "reply" field ENTIRELY in ${langName}.
+- If Tamil (ta-IN): write reply fully in Tamil script (தமிழ்)
+- If Telugu (te-IN): write reply fully in Telugu script (తెలుగు)
+- If Malayalam (ml-IN): write reply fully in Malayalam script (മലയാളം)
+- If Hindi (hi-IN): write reply fully in Hindi Devanagari script (हिंदी)
+- If English (en-IN): write reply in English
+Do NOT mix languages. Do NOT respond in English when the user spoke Tamil/Telugu/Malayalam/Hindi.
+Match the user's script exactly.
 
 You can perform these ACTIONS by returning structured JSON:
 
@@ -36,15 +56,14 @@ IMPORTANT — For REGISTER_RIDE and SEARCH_RIDES params:
 - "rideTime" MUST be in HH:MM 24-hour format (e.g. "09:00", "14:30"). Convert "9am" to "09:00", "2:30pm" to "14:30".
 - "vehicleType" MUST be one of: "Car", "Auto", "Cab", "Mini Bus"
 - "seatsAvailable" MUST be a number (e.g. 4, not "four")
-- DO NOT generate the reply assuming the ride is registered. Say something like "Let me register that for you..." or "Registering your ride..." — the system will confirm the registration.
+- DO NOT generate the reply assuming the ride is registered. Say something like "Let me register that for you..." in the user's language.
 
-Always respond in the SAME language the user spoke in.
 Be warm, friendly, concise — like a helpful local friend.
-If you need more info to complete an action, ask one question at a time in the user's language.
+If you need more info to complete an action, ask one question at a time in ${langName}.
 
 Return ONLY valid JSON, nothing else, no markdown:
 {
-  "reply": "your response in user's language",
+  "reply": "your response fully in ${langName}",
   "action": "SEARCH_RIDES | REGISTER_RIDE | REQUEST_JOIN | TRIGGER_SOS | GENERAL_HELP | null",
   "params": {}
 }`;
@@ -65,7 +84,7 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         // Build messages array for Groq
-        const messages = [{ role: 'system', content: getSystemPrompt() }];
+        const messages = [{ role: 'system', content: getSystemPrompt(detectedLanguage) }];
 
         // Add conversation history (last 10)
         if (conversationHistory && Array.isArray(conversationHistory)) {

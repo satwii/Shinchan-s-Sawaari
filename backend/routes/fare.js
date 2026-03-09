@@ -123,7 +123,17 @@ async function getDistanceKm(srcLat, srcLng, dstLat, dstLng) {
 // POST /api/fare/calculate
 router.post('/calculate', async (req, res) => {
     try {
-        const { source_lat, source_lng, destination_lat, destination_lng, vehicle_type, seats_filled } = req.body;
+        const { source_lat, source_lng, destination_lat, destination_lng, vehicle_type, seats_filled, ride_id } = req.body;
+
+        // FIX 1: FareShare rides must never call this endpoint — fare is split manually
+        if (ride_id) {
+            const { getDb } = require('../database');
+            const db = getDb();
+            const ride = db.prepare(`SELECT type FROM rides WHERE id = ?`).get(ride_id);
+            if (ride?.type === 'fareshare') {
+                return res.status(400).json({ error: 'FareShare rides do not use fare calculation. Passengers split the actual cab fare equally.' });
+            }
+        }
 
         // Debug: log incoming coords
         console.log('Fare calc coords:', { source_lat, source_lng, destination_lat, destination_lng, vehicle_type, seats_filled });

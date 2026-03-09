@@ -41,7 +41,7 @@ export default function WalletBadge() {
             onMouseLeave={e => e.currentTarget.style.background = 'rgba(139,92,246,0.12)'}
         >
             <span>💰</span>
-            <span>₩{Number(balance).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+            <span>₹{Number(balance).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
         </button>
     );
 }

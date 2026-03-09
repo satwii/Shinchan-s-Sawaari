@@ -956,7 +956,7 @@ router.post('/:id/cancel', authenticateToken, (req, res) => {
             for (const m of members) {
                 try {
                     transferWallet(db, userId, m.user_id, penaltyPerPerson, rideId,
-                        `Owner cancellation penalty — ₩${penaltyPerPerson} compensation for ride cancellation`);
+                        `Owner cancellation penalty — ₹${penaltyPerPerson} compensation for ride cancellation`);
                 } catch (e) { console.warn('Penalty transfer failed:', e.message); }
             }
         }
@@ -1101,7 +1101,7 @@ router.post('/:id/leave', authenticateToken, (req, res) => {
         // Notify owner
         try {
             db.prepare(`INSERT INTO notifications (user_id, type, message, ride_id) VALUES (?, 'passenger_left', ?, ?)`)
-                .run(ride.user_id, `${leaver.username} left your ride from ${ride.source} → ${ride.destination}.${feeAmount > 0 ? ` ₩${feeAmount} cancellation fee credited to your wallet.` : ''}`, rideId);
+                .run(ride.user_id, `${leaver.username} left your ride from ${ride.source} → ${ride.destination}.${feeAmount > 0 ? ` ₹${feeAmount} cancellation fee credited to your wallet.` : ''}`, rideId);
         } catch (_) { }
 
         res.json({
@@ -1109,7 +1109,7 @@ router.post('/:id/leave', authenticateToken, (req, res) => {
             fee_percent: feePct * 100,
             fee_amount: feeAmount,
             refund_amount: refundAmount,
-            message: feeAmount > 0 ? `Left ride. ₩${feeAmount} cancellation fee charged.` : 'Left ride. No fee — cancelled more than 24h before departure.',
+            message: feeAmount > 0 ? `Left ride. ₹${feeAmount} cancellation fee charged.` : 'Left ride. No fee — cancelled more than 24h before departure.',
         });
     } catch (err) {
         console.error('Leave ride error:', err);

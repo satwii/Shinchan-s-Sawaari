@@ -74,9 +74,9 @@ export default function FareCard({ sourceLat, sourceLng, destLat, destLng, vehic
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
                 {[
                     { label: 'Distance', value: `${fare.distance_km} km` },
-                    { label: 'Petrol rate', value: `₩${fare.petrol_price_per_litre}/L` },
-                    { label: 'Fuel cost', value: `₩${fare.fuel_cost}` },
-                    { label: `${fare.breakdown.total_persons} persons share`, value: `₩${fare.cost_per_person.toFixed(0)} each` },
+                    { label: 'Petrol rate', value: `₹${fare.petrol_price_per_litre}/L` },
+                    { label: 'Fuel cost', value: `₹${fare.fuel_cost}` },
+                    { label: `${fare.breakdown.total_persons} persons share`, value: `₹${fare.cost_per_person.toFixed(0)} each` },
                 ].map(({ label, value }) => (
                     <div key={label} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '8px 10px' }}>
                         <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>{label}</div>
@@ -91,11 +91,11 @@ export default function FareCard({ sourceLat, sourceLng, destLat, destLng, vehic
             }}>
                 <div>
                     <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>Each passenger pays</div>
-                    <div style={{ color: '#34d399', fontWeight: 700, fontSize: 20 }}>₩{fare.cost_per_person.toFixed(0)}</div>
+                    <div style={{ color: '#34d399', fontWeight: 700, fontSize: 20 }}>₹{fare.cost_per_person.toFixed(0)}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                     <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>Driver saves</div>
-                    <div style={{ color: '#a7f3d0', fontWeight: 600, fontSize: 13 }}>₩{fare.driver_saves.toFixed(0)}</div>
+                    <div style={{ color: '#a7f3d0', fontWeight: 600, fontSize: 13 }}>₹{fare.driver_saves.toFixed(0)}</div>
                 </div>
             </div>
 
