@@ -6,40 +6,43 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { getDb } = require('./database');
+const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
 const server = http.createServer(app);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'sawaari_secret';
 const PORT = process.env.PORT || 5000;
-const CORS_ORIGIN = process.env.CLIENT_ORIGIN
-    ? [process.env.CLIENT_ORIGIN]
-    : (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, Postman)
-        if (!origin) return callback(null, true);
-        // Allow localhost in dev
-        if (/^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
-        if (/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) return callback(null, true);
-        // Allow Render.com deployments
-        if (/\.onrender\.com$/.test(origin)) return callback(null, true);
-        // Allow Azure
-        if (/\.azurewebsites\.net$/.test(origin)) return callback(null, true);
-        // Allow any HTTPS origin in production
-        if (process.env.NODE_ENV === 'production' && origin.startsWith('https://')) return callback(null, true);
-        callback(new Error('CORS not allowed for: ' + origin));
-    };
+
+// Explicit CORS allowlist — includes Render frontend + local dev
+const ALLOWED_ORIGINS = [
+    'https://shinchan-s-sawaari-f.onrender.com',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'http://127.0.0.1:3000',
+];
 
 // ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
 app.use(cors({
-    origin: CORS_ORIGIN,
-    credentials: true
+    origin: (origin, callback) => {
+        // Allow requests with no origin (Postman, mobile apps, curl)
+        if (!origin) return callback(null, true);
+        // Allow anything in the explicit list
+        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        // Also allow any *.onrender.com or *.azurewebsites.net subdomain dynamically
+        if (/\.onrender\.com$/.test(origin)) return callback(null, true);
+        if (/\.azurewebsites\.net$/.test(origin)) return callback(null, true);
+        callback(new Error('CORS not allowed for: ' + origin));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
 }));
 app.use(express.json());
 
 // ─── SOCKET.IO ────────────────────────────────────────────────────────────────
 const io = new Server(server, {
     cors: {
-        origin: CORS_ORIGIN,
+        origin: ALLOWED_ORIGINS,
         methods: ['GET', 'POST'],
         credentials: true
     }
@@ -170,12 +173,68 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error' });
 });
 
-// ─── START ────────────────────────────────────────────────────────────────────
+// ─── POST /api/sos ─────────────────────────────────────────────────────
+app.post('/api/sos', authenticateToken, (req, res) => {
+    try {
+        const { ride_id, lat, lng, message } = req.body;
+        const db = getDb();
+        const userId = req.user.userId;
+
+        console.log(`\n🚨 [SOS TRIGGERED] User ${userId} | Ride ${ride_id} | Lat ${lat} Lng ${lng} | ${new Date().toISOString()}`);
+
+        // Get user emergency contact
+        const user = db.prepare(`SELECT username, emergency_contact_name, emergency_contact_phone FROM users WHERE id = ?`).get(userId);
+
+        // Get all ride members to notify
+        if (ride_id) {
+            const members = db.prepare(`SELECT user_id FROM ride_members WHERE ride_id = ? AND user_id != ?`).all(ride_id, userId);
+            for (const m of members) {
+                try {
+                    db.prepare(`INSERT INTO notifications (user_id, type, message, ride_id) VALUES (?, 'sos', ?, ?)`)
+                        .run(m.user_id, `🚨 SOS ALERT from ${user?.username || 'a co-passenger'}! They may need help. Location: ${lat ? `${lat},${lng}` : 'unavailable'}`, ride_id);
+                } catch (_) { }
+            }
+        }
+
+        console.log(`   Emergency Contact: ${user?.emergency_contact_name} (${user?.emergency_contact_phone})`);
+        console.log(`   Location: https://maps.google.com/?q=${lat},${lng}`);
+
+        res.json({ success: true, message: 'SOS triggered. Help is on the way.' });
+    } catch (err) {
+        console.error('SOS error:', err);
+        res.status(500).json({ error: 'SOS failed' });
+    }
+});
+
+// ─── EXPIRED RIDES CLEANUP JOB (Fix 2) ────────────────────────────────────
+function markExpiredRides() {
+    try {
+        const db = getDb();
+        const result = db.prepare(`
+            UPDATE rides SET status = 'expired'
+            WHERE status = 'active'
+              AND datetime(date || 'T' || COALESCE(ride_time, '23:59') || ':00') < datetime('now')
+        `).run();
+        if (result.changes > 0) {
+            console.log(`⏰ Marked ${result.changes} expired ride(s)`);
+        }
+    } catch (err) {
+        console.error('Expired rides cleanup error:', err);
+    }
+}
+
+// ─── START ─────────────────────────────────────────────────────
 getDb();
+
+// Run cleanup immediately on start, then every hour
+markExpiredRides();
+setInterval(markExpiredRides, 60 * 60 * 1000);
 
 server.listen(PORT, () => {
     console.log(`\n🚗 Sawaari Backend running on http://localhost:${PORT}`);
     console.log(`📡 Socket.IO ready`);
+    console.log(`🖬 Azure Speech: ${process.env.AZURE_SPEECH_KEY ? 'LOADED' : 'MISSING'}`);
+    console.log(`🗺️  ORS API: ${process.env.ORS_API_KEY ? 'LOADED' : 'MISSING'}`);
     console.log(`🗄️  Database: SQLite (sawaari.db)\n`);
 });
 
