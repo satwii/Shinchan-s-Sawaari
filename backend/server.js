@@ -32,17 +32,16 @@ const corsOptions = {
             /\.onrender\.com$/.test(origin) ||
             /\.azurewebsites\.net$/.test(origin)
         ) {
-            return callback(null, true);
+            return callback(null, origin);   // ← IMPORTANT CHANGE
         }
 
         console.log("Blocked CORS origin:", origin);
-
-        // instead of throwing error, deny quietly
         return callback(null, false);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
+    optionsSuccessStatus: 200
 };
 
 // ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
