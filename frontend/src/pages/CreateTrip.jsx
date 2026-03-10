@@ -47,6 +47,10 @@ export default function CreateTrip() {
         e.preventDefault();
         setError('');
         if (!selectedVehicleId) return setError('Please select a vehicle');
+        if (!tripCoords.srcLat || !tripCoords.dstLat) {
+            setError('⚠️ Please select locations from the dropdown suggestions to enable en-route matching.');
+            // Don't block — allow creation without coords but warn driver
+        }
         setLoading(true);
         try {
             await api.post('/ts/trips', {
@@ -59,6 +63,11 @@ export default function CreateTrip() {
                 price: calculatedFare || 0,
                 calculated_fare: calculatedFare,
                 pink_mode: trip.pink_mode,
+                // Coordinates — required for en-route polyline matching
+                source_lat: tripCoords.srcLat,
+                source_lng: tripCoords.srcLng,
+                destination_lat: tripCoords.dstLat,
+                destination_lng: tripCoords.dstLng,
             });
             navigate('/driver/trips');
         } catch (err) {

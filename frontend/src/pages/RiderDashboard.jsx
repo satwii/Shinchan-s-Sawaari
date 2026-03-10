@@ -20,10 +20,13 @@ export default function RiderDashboard() {
 
     const isFemale = user?.gender === 'Female';
 
+    const [coordsWarning, setCoordsWarning] = useState(false);
+
     async function handleSearch(e) {
         e.preventDefault();
         setLoading(true);
         setSearched(true);
+        setCoordsWarning(!sourceLat || !destLat);
         try {
             const params = { source, destination };
             if (pinkMode) params.pink_mode = 'true';
@@ -121,6 +124,12 @@ export default function RiderDashboard() {
                 </button>
 
                 {/* Results */}
+                {coordsWarning && (
+                    <div className="mb-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-medium animate-fade-in">
+                        ⚠️ For en-route matching, please select pickup and drop from the suggestion list (not free text). Showing all trips with string matching for now.
+                    </div>
+                )}
+
                 {searched && !loading && trips.length === 0 && (
                     <div className="card text-center py-10">
                         <div className="text-4xl mb-3">🔍</div>

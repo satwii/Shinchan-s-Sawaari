@@ -246,6 +246,12 @@ function initSchema() {
         { table: 'rides', column: 'cancelled_at', type: 'TEXT' },
         { table: 'rides', column: 'cancellation_reason', type: 'TEXT' },
         { table: 'trips', column: 'calculated_fare', type: 'REAL' },
+        { table: 'trips', column: 'source_lat', type: 'REAL' },
+        { table: 'trips', column: 'source_lng', type: 'REAL' },
+        { table: 'trips', column: 'destination_lat', type: 'REAL' },
+        { table: 'trips', column: 'destination_lng', type: 'REAL' },
+        { table: 'trips', column: 'route_polyline', type: 'TEXT' },
+        { table: 'trips', column: 'distance_km', type: 'REAL' },
     ];
 
     for (const m of migrations) {

@@ -47,7 +47,8 @@ function isEnRoute(polylinePoints, pickupLat, pickupLng, dropLat, dropLng, thres
     return pickupIdx !== -1 && dropIdx !== -1 && dropIdx > pickupIdx;
 }
 
-const MATCH_RADIUS_KM = 5; // rides within 5 km radius are considered overlapping
+const SRC_MATCH_KM = 8;  // FIX 1D: generous source radius — allows en-route boarding
+const DST_MATCH_KM = 5;  // tighter destination radius
 
 function routeOverlaps(ride, searchSource, searchDest, searchSrcLat, searchSrcLng, searchDstLat, searchDstLng) {
     // ── Coordinate-based matching (preferred) ─────────────────────────────
@@ -57,7 +58,7 @@ function routeOverlaps(ride, searchSource, searchDest, searchSrcLat, searchSrcLn
     if (hasSrcCoords && hasDstCoords) {
         const srcDist = haversineKm(searchSrcLat, searchSrcLng, ride.source_lat, ride.source_lng);
         const dstDist = haversineKm(searchDstLat, searchDstLng, ride.destination_lat, ride.destination_lng);
-        return srcDist <= MATCH_RADIUS_KM && dstDist <= MATCH_RADIUS_KM;
+        return srcDist <= SRC_MATCH_KM && dstDist <= DST_MATCH_KM;
     }
 
     // ── String-based fallback ─────────────────────────────────────────────

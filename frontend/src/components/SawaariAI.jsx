@@ -44,6 +44,7 @@ function detectTextLanguage(text) {
     if (/[\u0C00-\u0C7F]/.test(text)) return 'te-IN'; // Telugu
     if (/[\u0D00-\u0D7F]/.test(text)) return 'ml-IN'; // Malayalam
     if (/[\u0900-\u097F]/.test(text)) return 'hi-IN'; // Devanagari (Hindi)
+    if (/[\u0C80-\u0CFF]/.test(text)) return 'kn-IN'; // Kannada
     return 'en-IN';
 }
 
@@ -209,7 +210,9 @@ export default function SawaariAI() {
         if (!input.trim() || loading) return;
         const text = input.trim();
         setInput('');
-        sendToAgent(text);
+        // Detect language from typed Unicode script
+        const typedLang = detectTextLanguage(text);
+        sendToAgent(text, typedLang);
     };
 
     // ── Handle join request from chat ──────────────────────────────────────
@@ -327,7 +330,7 @@ export default function SawaariAI() {
                     return;
                 }
 
-                // Send to Azure transcription
+                // Send to Sarvam AI for transcription (native Indian script)
                 setLoading(true);
                 try {
                     const formData = new FormData();

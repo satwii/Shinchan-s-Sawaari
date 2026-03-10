@@ -313,8 +313,8 @@ setInterval(markExpiredRides, 60 * 60 * 1000);
 server.listen(PORT, () => {
     console.log(`\n🚗 Sawaari Backend running on http://localhost:${PORT}`);
     console.log(`📡 Socket.IO ready`);
-    console.log(`🖬 Azure Speech: ${process.env.AZURE_SPEECH_KEY ? 'LOADED' : 'MISSING'}`);
-    console.log(`🗺️  ORS API: ${process.env.ORS_API_KEY ? 'LOADED' : 'MISSING'}`);
+    console.log(`🎤 Sarvam AI: ${process.env.SARVAM_API_KEY ? 'LOADED' : 'MISSING ⚠️'}`);
+    console.log(`🗺️  ORS API: ${process.env.ORS_API_KEY ? 'LOADED' : 'MISSING ⚠️'}`);
     console.log(`🗄️  Database: SQLite (sawaari.db)\n`);
 });
 

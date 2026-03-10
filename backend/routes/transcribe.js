@@ -1,77 +1,59 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const sdk = require('microsoft-cognitiveservices-speech-sdk');
+const axios = require('axios');
+const FormData = require('form-data');
 const { authenticateToken } = require('../middleware/auth');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// POST /api/transcribe — Azure Speech-to-Text with auto language detection
+// POST /api/transcribe — Sarvam AI saaras:v3 (native Indian script output)
 router.post('/', authenticateToken, upload.single('audio'), async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: 'No audio file provided' });
+            return res.status(400).json({ error: 'No audio file received' });
         }
 
-        const speechKey = process.env.AZURE_SPEECH_KEY;
-        const speechRegion = process.env.AZURE_SPEECH_REGION;
-
-        if (!speechKey || !speechRegion) {
-            console.error('Azure Speech credentials missing');
-            return res.status(500).json({ error: 'transcription_failed', message: 'Speech service not configured' });
+        const sarvamKey = process.env.SARVAM_API_KEY;
+        if (!sarvamKey) {
+            console.error('SARVAM_API_KEY missing from .env');
+            return res.status(500).json({ error: 'transcription_failed', message: 'Sarvam API key not configured' });
         }
 
-        const audioBuffer = req.file.buffer;
+        const formData = new FormData();
+        formData.append('file', req.file.buffer, {
+            filename: 'audio.webm',
+            contentType: req.file.mimetype || 'audio/webm',
+        });
+        formData.append('model', 'saaras:v3');
+        formData.append('language_code', 'unknown'); // auto-detect
+        formData.append('mode', 'transcribe');        // returns native script
 
-        // Create push stream and push audio data
-        const pushStream = sdk.AudioInputStream.createPushStream();
-        pushStream.write(audioBuffer);
-        pushStream.close();
-
-        const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
-        const speechConfig = sdk.SpeechConfig.fromSubscription(speechKey, speechRegion);
-
-        // Set up auto language detection for Indian languages
-        const autoDetectConfig = sdk.AutoDetectSourceLanguageConfig.fromLanguages([
-            'ta-IN', 'te-IN', 'ml-IN', 'hi-IN', 'en-IN'
-        ]);
-
-        const recognizer = sdk.SpeechRecognizer.FromConfig(
-            speechConfig, autoDetectConfig, audioConfig
+        const response = await axios.post(
+            'https://api.sarvam.ai/speech-to-text',
+            formData,
+            {
+                headers: {
+                    ...formData.getHeaders(),
+                    'api-subscription-key': sarvamKey,
+                },
+                timeout: 15000,
+            }
         );
 
-        const result = await new Promise((resolve, reject) => {
-            recognizer.recognizeOnceAsync(
-                (result) => {
-                    recognizer.close();
-                    resolve(result);
-                },
-                (err) => {
-                    recognizer.close();
-                    reject(err);
-                }
-            );
-        });
+        const transcript = response.data.transcript || '';
+        const detectedLanguage = response.data.language_code || 'en-IN';
 
-        if (result.reason === sdk.ResultReason.RecognizedSpeech) {
-            const detectedLang = result.language ||
-                sdk.AutoDetectSourceLanguageResult.fromResult(result)?.language || 'en-IN';
+        console.log(`🎤 Sarvam transcript: "${transcript}" [${detectedLanguage}]`);
 
-            console.log(`🎤 Transcribed: "${result.text}" [${detectedLang}]`);
-
-            res.json({
-                transcript: result.text,
-                detectedLanguage: detectedLang,
-            });
-        } else if (result.reason === sdk.ResultReason.NoMatch) {
-            console.log('🎤 No speech recognized');
-            res.json({ transcript: '', error: 'no_speech' });
-        } else {
-            console.error('🎤 Recognition failed:', result.reason);
-            res.status(400).json({ error: 'transcription_failed' });
+        if (!transcript.trim()) {
+            return res.json({ transcript: '', error: 'no_speech' });
         }
+
+        res.json({ transcript, detectedLanguage });
+
     } catch (err) {
-        console.error('Transcription error:', err);
+        console.error('Sarvam transcription error:', err.response?.data || err.message);
         res.status(500).json({ error: 'transcription_failed', message: err.message });
     }
 });

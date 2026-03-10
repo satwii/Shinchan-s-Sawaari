@@ -1,9 +1,127 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const { getDb } = require('../database');
 const { authenticateToken } = require('../middleware/auth');
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// ─── EN-ROUTE MATCHING UTILITIES ────────────────────────────────────────────
+
+function haversineMetres(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function isEnRoute(polylineJSON, pickupLat, pickupLng, dropLat, dropLng) {
+    let coords;
+    try { coords = JSON.parse(polylineJSON); } catch { return false; }
+    if (!Array.isArray(coords) || coords.length === 0) return false;
+
+    // ORS geometry.coordinates = [[lng, lat], ...]
+    const THRESHOLD = 800; // 800 metres — generous for city streets
+    let pickupIdx = -1, dropIdx = -1;
+
+    for (let i = 0; i < coords.length; i++) {
+        const [lng, lat] = coords[i];
+        if (pickupIdx === -1) {
+            if (haversineMetres(lat, lng, pickupLat, pickupLng) <= THRESHOLD) {
+                pickupIdx = i;
+            }
+        } else {
+            if (haversineMetres(lat, lng, dropLat, dropLng) <= THRESHOLD) {
+                dropIdx = i;
+                break;
+            }
+        }
+    }
+
+    const matched = pickupIdx !== -1 && dropIdx !== -1 && dropIdx > pickupIdx;
+    console.log(`  isEnRoute: pickupIdx=${pickupIdx} dropIdx=${dropIdx} matched=${matched}`);
+    return matched;
+}
+
+function fallbackMatch(trip, pickupLat, pickupLng, dropLat, dropLng) {
+    // No polyline: check if passenger pickup lies between src and dst (generous 8km src, 3km dst)
+    const pickupNearSource = haversineMetres(
+        pickupLat, pickupLng, trip.source_lat, trip.source_lng) <= 8000;
+
+    const dropNearDest = haversineMetres(
+        dropLat, dropLng, trip.destination_lat, trip.destination_lng) <= 3000;
+
+    const totalDist = haversineMetres(
+        trip.source_lat, trip.source_lng,
+        trip.destination_lat, trip.destination_lng);
+    const pickupFromSrc = haversineMetres(
+        pickupLat, pickupLng, trip.source_lat, trip.source_lng);
+    const pickupBetween = pickupFromSrc < totalDist;
+
+    const matched = (pickupNearSource || pickupBetween) && dropNearDest;
+    console.log(`  fallback: nearSrc=${pickupNearSource} between=${pickupBetween} nearDst=${dropNearDest} → ${matched}`);
+    return matched;
+}
+
+function rideMatchesPassenger(trip, pickupLat, pickupLng, dropLat, dropLng) {
+    console.log(`Checking trip ${trip.id}: ${trip.source} → ${trip.destination}`);
+    if (trip.route_polyline) {
+        console.log(`  Using polyline matching`);
+        return isEnRoute(trip.route_polyline, pickupLat, pickupLng, dropLat, dropLng);
+    }
+    // String fallback when no coords at all
+    if (!trip.source_lat || !trip.source_lng || !trip.destination_lat || !trip.destination_lng) {
+        console.log(`  No coords or polyline — skipping trip ${trip.id}`);
+        return true; // show it — better than hiding valid trips
+    }
+    console.log(`  No polyline — using fallback`);
+    return fallbackMatch(trip, pickupLat, pickupLng, dropLat, dropLng);
+}
+
+// ─── BACKFILL POLYLINES for existing trips on server start ──────────────────
+async function backfillPolylines() {
+    try {
+        const db = getDb();
+        const trips = db.prepare(`
+            SELECT id, source_lat, source_lng, destination_lat, destination_lng
+            FROM trips
+            WHERE route_polyline IS NULL
+            AND source_lat IS NOT NULL AND source_lng IS NOT NULL
+            AND destination_lat IS NOT NULL AND destination_lng IS NOT NULL
+        `).all();
+
+        if (trips.length === 0) {
+            console.log('✅ No trips need polyline backfill');
+            return;
+        }
+        console.log(`🗺️  Backfilling polylines for ${trips.length} trip(s)...`);
+
+        for (const trip of trips) {
+            try {
+                const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${process.env.ORS_API_KEY}&start=${trip.source_lng},${trip.source_lat}&end=${trip.destination_lng},${trip.destination_lat}`;
+                const r = await axios.get(url, { timeout: 8000 });
+                const coords = r.data.features[0].geometry.coordinates;
+                db.prepare(`UPDATE trips SET route_polyline = ? WHERE id = ?`)
+                    .run(JSON.stringify(coords), trip.id);
+                console.log(`  ✅ Trip ${trip.id}: ${coords.length} polyline points`);
+                await new Promise(res => setTimeout(res, 400)); // ORS rate limit
+            } catch (e) {
+                console.log(`  ⚠️  Trip ${trip.id}: ORS failed — ${e.message}`);
+            }
+        }
+        console.log('🗺️  Backfill complete.');
+    } catch (e) {
+        console.error('Backfill error:', e.message);
+    }
+}
+
+// Run backfill after a short delay (allows DB to fully init first)
+setTimeout(backfillPolylines, 3000);
+
+// ─── VEHICLE ROUTES ───────────────────────────────────────────────────────────
 function getStatusId(db, name) {
     const row = db.prepare(`SELECT id FROM trip_status WHERE name = ?`).get(name);
     return row ? row.id : null;
@@ -73,7 +191,7 @@ router.get('/vehicles', authenticateToken, (req, res) => {
 
 // ─── TRIP ROUTES ──────────────────────────────────────────────────────────────
 
-// GET /api/trips-service/trips — Public: search all open/full trips
+// GET /api/trips-service/trips — Passenger searches trips (en-route polyline matching)
 router.get('/trips', authenticateToken, (req, res) => {
     try {
         const db = getDb();
@@ -83,9 +201,12 @@ router.get('/trips', authenticateToken, (req, res) => {
         const { source, destination, pink_mode, source_lat, source_lng, dest_lat, dest_lng } = req.query;
         const userGender = req.user.gender;
 
-        let query = `
+        // Fetch ALL non-cancelled, non-completed future trips
+        let baseQuery = `
       SELECT t.id, t.source, t.destination, t.trip_date, t.trip_time,
              t.available_seats, t.price_per_seat, t.pink_mode,
+             t.source_lat, t.source_lng, t.destination_lat, t.destination_lng,
+             t.route_polyline,
              ts.name AS status_name,
              v.model, v.type AS vehicle_type, v.color, v.capacity,
              u.username AS driver_name, u.gender AS driver_gender
@@ -97,54 +218,51 @@ router.get('/trips', authenticateToken, (req, res) => {
     `;
         const params = [];
 
-        // Pink mode filtering:
         if (pink_mode === 'true' || pink_mode === '1') {
-            query += ` AND t.pink_mode = 1`;
+            baseQuery += ` AND t.pink_mode = 1`;
         } else if (userGender !== 'Female') {
-            query += ` AND (t.pink_mode = 0 OR v.driver_id = ?)`;
+            baseQuery += ` AND (t.pink_mode = 0 OR v.driver_id = ?)`;
             params.push(req.user.userId);
         }
+        baseQuery += ` ORDER BY t.trip_date ASC, t.trip_time ASC`;
 
-        query += ` ORDER BY t.trip_date ASC, t.trip_time ASC`;
+        const allTrips = db.prepare(baseQuery).all(...params);
 
-        const trips = db.prepare(query).all(...params);
+        const pLat = parseFloat(source_lat);
+        const pLng = parseFloat(source_lng);
+        const dLat = parseFloat(dest_lat);
+        const dLng = parseFloat(dest_lng);
+        const hasCoords = !isNaN(pLat) && !isNaN(pLng) && !isNaN(dLat) && !isNaN(dLng);
 
-        // ── En-route / coordinate matching ──────────────────────────────────
-        const srcLat = parseFloat(source_lat);
-        const srcLng = parseFloat(source_lng);
-        const dstLat = parseFloat(dest_lat);
-        const dstLng = parseFloat(dest_lng);
-        const hasCoords = !isNaN(srcLat) && !isNaN(srcLng) && !isNaN(dstLat) && !isNaN(dstLng);
-        const MATCH_KM = 5;
+        console.log('=== DRIVESHARE SEARCH ===');
+        console.log(`Pickup:  ${pLat}, ${pLng}`);
+        console.log(`Dropoff: ${dLat}, ${dLng}`);
+        console.log(`Total trips to check: ${allTrips.length}`);
 
-        function haversineKm(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const toRad = d => d * Math.PI / 180;
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat / 2) ** 2 +
-                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        let filtered;
+        if (!hasCoords) {
+            // No coordinates provided — use string matching
+            if (!source && !destination) {
+                filtered = allTrips;
+            } else {
+                filtered = allTrips.filter(trip => {
+                    const ts = (trip.source || '').toLowerCase();
+                    const td = (trip.destination || '').toLowerCase();
+                    const qs = (source || '').toLowerCase().trim();
+                    const qd = (destination || '').toLowerCase().trim();
+                    return (!qs || ts.includes(qs) || qs.includes(ts)) &&
+                        (!qd || td.includes(qd) || qd.includes(td));
+                });
+            }
+        } else {
+            // Coordinates available — use en-route polyline matching
+            filtered = allTrips.filter(trip =>
+                rideMatchesPassenger(trip, pLat, pLng, dLat, dLng)
+            );
         }
 
-        const filtered = trips.filter(trip => {
-            // ─ Coordinate-based match (preferred) ──────────────────────────
-            if (hasCoords && trip.source_lat && trip.source_lng && trip.dest_lat && trip.dest_lng) {
-                const srcDist = haversineKm(srcLat, srcLng, trip.source_lat, trip.source_lng);
-                const dstDist = haversineKm(dstLat, dstLng, trip.dest_lat, trip.dest_lng);
-                return srcDist <= MATCH_KM && dstDist <= MATCH_KM;
-            }
-
-            // ─ String-based fallback ───────────────────────────────────────
-            if (!source && !destination) return true; // no filter requested
-            const ts = (trip.source || '').toLowerCase();
-            const td = (trip.destination || '').toLowerCase();
-            const qs = (source || '').toLowerCase().trim();
-            const qd = (destination || '').toLowerCase().trim();
-            const srcMatch = !qs || ts.includes(qs) || qs.includes(ts);
-            const dstMatch = !qd || td.includes(qd) || qd.includes(td);
-            return srcMatch && dstMatch;
-        });
+        console.log(`Matched: ${filtered.length} trips`);
+        console.log('=========================');
 
         res.json({ trips: filtered });
     } catch (err) {
@@ -180,11 +298,16 @@ router.get('/trips/:id', authenticateToken, (req, res) => {
     }
 });
 
-// POST /api/trips-service/trips — Driver creates trip
-router.post('/trips', authenticateToken, (req, res) => {
+// POST /api/trips-service/trips — Driver creates trip (stores coords + fetches ORS polyline)
+router.post('/trips', authenticateToken, async (req, res) => {
     if (req.user.role !== 'driver') return res.status(403).json({ error: 'Only drivers can create trips' });
     try {
-        const { vehicle_id, source, destination, date, time, available_seats, price, pink_mode } = req.body;
+        const {
+            vehicle_id, source, destination, date, time,
+            available_seats, price, pink_mode,
+            source_lat, source_lng, destination_lat, destination_lng
+        } = req.body;
+
         if (!vehicle_id || !source || !destination || !date || !time || !available_seats) {
             return res.status(400).json({ error: 'All trip fields are required' });
         }
@@ -192,19 +315,55 @@ router.post('/trips', authenticateToken, (req, res) => {
         const db = getDb();
 
         // Ensure vehicle belongs to this driver
-        const vehicle = db.prepare(`SELECT id FROM vehicles WHERE id = ? AND driver_id = ?`).get(parseInt(vehicle_id), req.user.userId);
+        const vehicle = db.prepare(`SELECT id FROM vehicles WHERE id = ? AND driver_id = ?`)
+            .get(parseInt(vehicle_id), req.user.userId);
         if (!vehicle) return res.status(403).json({ error: 'Vehicle not found or unauthorized' });
 
         const openId = getStatusId(db, 'Open');
-        const result = db.prepare(`
-      INSERT INTO trips (vehicle_id, source, destination, trip_date, trip_time, available_seats, price_per_seat, status_id, pink_mode)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(parseInt(vehicle_id), source.trim(), destination.trim(), date, time, parseInt(available_seats), parseFloat(price) || 0, openId, pink_mode ? 1 : 0);
 
-        res.status(201).json({ success: true, trip_id: result.lastInsertRowid });
+        // Normalise coordinates
+        const srcLat = parseFloat(source_lat) || null;
+        const srcLng = parseFloat(source_lng) || null;
+        const dstLat = parseFloat(destination_lat) || null;
+        const dstLng = parseFloat(destination_lng) || null;
+
+        // Insert trip immediately (don't block on ORS)
+        const result = db.prepare(`
+            INSERT INTO trips
+                (vehicle_id, source, destination, trip_date, trip_time,
+                 available_seats, price_per_seat, status_id, pink_mode,
+                 source_lat, source_lng, destination_lat, destination_lng)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            parseInt(vehicle_id), source.trim(), destination.trim(),
+            date, time, parseInt(available_seats),
+            parseFloat(price) || 0, openId, pink_mode ? 1 : 0,
+            srcLat, srcLng, dstLat, dstLng
+        );
+
+        const tripId = result.lastInsertRowid;
+        res.status(201).json({ success: true, trip_id: tripId });
+
+        // Fetch ORS polyline asynchronously — after responding to client
+        if (srcLat && srcLng && dstLat && dstLng) {
+            try {
+                const orsUrl = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${process.env.ORS_API_KEY}&start=${srcLng},${srcLat}&end=${dstLng},${dstLat}`;
+                const orsRes = await axios.get(orsUrl, { timeout: 10000 });
+                const feature = orsRes.data.features[0];
+                const coords = feature.geometry.coordinates; // [[lng,lat], ...]
+                const distKm = feature.properties.segments[0].distance / 1000;
+                db.prepare(`UPDATE trips SET route_polyline = ?, distance_km = ? WHERE id = ?`)
+                    .run(JSON.stringify(coords), distKm, tripId);
+                console.log(`🗺️  ORS polyline stored for trip ${tripId}: ${coords.length} points, ${distKm.toFixed(1)} km`);
+            } catch (orsErr) {
+                console.error(`⚠️  ORS failed for trip ${tripId}:`, orsErr.response?.data || orsErr.message);
+            }
+        } else {
+            console.log(`⚠️  Trip ${tripId} created without coordinates — polyline matching unavailable`);
+        }
     } catch (err) {
         console.error('Create trip error:', err);
-        res.status(500).json({ error: 'Failed to create trip' });
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to create trip' });
     }
 });
 
