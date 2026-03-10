@@ -47,6 +47,10 @@ export default function CreateTrip() {
         e.preventDefault();
         setError('');
         if (!selectedVehicleId) return setError('Please select a vehicle');
+        // Validate time — both hour and minute must be chosen
+        if (!trip.time || !trip.time.match(/^\d{2}:\d{2}$/)) {
+            return setError('Please select both hour and minute for the departure time.');
+        }
         if (!tripCoords.srcLat || !tripCoords.dstLat) {
             setError('⚠️ Please select locations from the dropdown suggestions to enable en-route matching.');
             // Don't block — allow creation without coords but warn driver
@@ -201,8 +205,43 @@ export default function CreateTrip() {
                             </div>
                             <div>
                                 <label className="label">Time</label>
-                                <input type="time" value={trip.time} onChange={e => setTrip({ ...trip, time: e.target.value })}
-                                    className="input-field" required />
+                                <div className="flex gap-2">
+                                    {/* Hour selector */}
+                                    <select
+                                        id="trip-hour"
+                                        value={trip.time ? trip.time.split(':')[0] : ''}
+                                        onChange={e => {
+                                            const min = trip.time ? trip.time.split(':')[1] || '00' : '00';
+                                            setTrip({ ...trip, time: `${e.target.value}:${min}` });
+                                        }}
+                                        className="input-field flex-1"
+                                        required
+                                    >
+                                        <option value="" disabled>HH</option>
+                                        {Array.from({ length: 24 }, (_, i) => (
+                                            <option key={i} value={String(i).padStart(2, '0')}>
+                                                {String(i).padStart(2, '0')}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span className="flex items-center text-sawaari-muted font-bold text-lg">:</span>
+                                    {/* Minute selector */}
+                                    <select
+                                        id="trip-minute"
+                                        value={trip.time ? trip.time.split(':')[1] || '' : ''}
+                                        onChange={e => {
+                                            const hr = trip.time ? trip.time.split(':')[0] || '00' : '00';
+                                            setTrip({ ...trip, time: `${hr}:${e.target.value}` });
+                                        }}
+                                        className="input-field flex-1"
+                                        required
+                                    >
+                                        <option value="" disabled>MM</option>
+                                        {['00', '15', '30', '45'].map(m => (
+                                            <option key={m} value={m}>{m}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </div>
                         {/* Sawaari Fare Calculator — read only */}

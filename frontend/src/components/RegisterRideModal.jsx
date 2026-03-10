@@ -153,9 +153,39 @@ export default function RegisterRideModal({ isOpen, onClose, onRegistered }) {
                                 </div>
                                 <div>
                                     <label className="label">Time ⏰</label>
-                                    <input type="time" value={form.rideTime}
-                                        onChange={e => handleChange('rideTime', e.target.value)}
-                                        className="input-field" />
+                                    <div className="flex gap-2">
+                                        <select
+                                            id="ride-hour"
+                                            value={form.rideTime ? form.rideTime.split(':')[0] : ''}
+                                            onChange={e => {
+                                                const min = form.rideTime ? form.rideTime.split(':')[1] || '00' : '00';
+                                                handleChange('rideTime', `${e.target.value}:${min}`);
+                                            }}
+                                            className="input-field flex-1"
+                                        >
+                                            <option value="" disabled>HH</option>
+                                            {Array.from({ length: 24 }, (_, i) => (
+                                                <option key={i} value={String(i).padStart(2, '0')}>
+                                                    {String(i).padStart(2, '0')}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <span className="flex items-center text-sawaari-muted font-bold text-lg">:</span>
+                                        <select
+                                            id="ride-minute"
+                                            value={form.rideTime ? form.rideTime.split(':')[1] || '' : ''}
+                                            onChange={e => {
+                                                const hr = form.rideTime ? form.rideTime.split(':')[0] || '00' : '00';
+                                                handleChange('rideTime', `${hr}:${e.target.value}`);
+                                            }}
+                                            className="input-field flex-1"
+                                        >
+                                            <option value="" disabled>MM</option>
+                                            {['00', '15', '30', '45'].map(m => (
+                                                <option key={m} value={m}>{m}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                             <button type="submit" className="btn-primary w-full">Next →</button>
