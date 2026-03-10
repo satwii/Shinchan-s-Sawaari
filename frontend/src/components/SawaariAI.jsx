@@ -38,13 +38,54 @@ function detectSOSLanguage(text) {
     return 'en-IN';
 }
 
+// ─── TANGLISH DETECTION ─────────────────────────────────────────────────────
+// Catches Tamil written in Roman script ("Enakku", "eppadi", "irukinga", etc.)
+// These have NO Tamil Unicode so detectTextLanguage() would wrongly return en-IN
+const TANGLISH_WORDS = [
+    // Pronouns & questions
+    'enakku', 'ennaku', 'naan', 'naanum', 'unakku', 'avanga', 'ivanga',
+    'enna', 'yenna', 'epdi', 'eppadi', 'eppo', 'yeppo', 'enga', 'inga',
+    'ungaluku', 'ungalukku', 'thambi', 'tambi', 'akka', 'anna', 'nanba',
+    'nanban', 'machaan', 'macha', 'da', 'di',
+    // Verbs / common phrases
+    'irukinga', 'irukku', 'iruken', 'illai', 'illa', 'theriyum', 'therla',
+    'pesanum', 'pesrom', 'solrom', 'sollu', 'sollrom', 'seri', 'sarie',
+    'vandhu', 'vandhittaen', 'vandhuten', 'poganum', 'porom', 'paakalam',
+    'paaru', 'vaa', 'vango', 'konjam', 'kooda', 'mudiyuma', 'mudiyum',
+    'mudila', 'venda', 'vendaam', 'therinja', 'therinchu', 'therinja',
+    'soldra', 'soldren', 'kitta', 'kitte', 'kittae',
+    // Travel / ride context
+    'naal', 'naalu', 'college', 'junction', 'stop', 'bus', 'ooru',
+    'povom', 'poren', 'varom', 'vaaren', 'varen', 'varuvom',
+    // Fillers & acknowledgement
+    'aama', 'aamam', 'ille', 'othunga', 'okay', 'appram', 'apram',
+    'adha', 'atha', 'ithu', 'idhu', 'andha', 'anda',
+];
+
+function detectTanglish(text) {
+    const lower = text.toLowerCase();
+    // Split by spaces and punctuation
+    const words = lower.split(/[\s,?.!]+/).filter(Boolean);
+    let hits = 0;
+    for (const word of words) {
+        if (TANGLISH_WORDS.some(tw => word === tw || word.startsWith(tw + 'a') || word.startsWith(tw + 'e'))) {
+            hits++;
+        }
+    }
+    // 1+ Tanglish word is enough to call it Tamil
+    return hits >= 1;
+}
+
 function detectTextLanguage(text) {
-    // Detect language from Unicode character ranges
-    if (/[\u0B80-\u0BFF]/.test(text)) return 'ta-IN'; // Tamil
-    if (/[\u0C00-\u0C7F]/.test(text)) return 'te-IN'; // Telugu
-    if (/[\u0D00-\u0D7F]/.test(text)) return 'ml-IN'; // Malayalam
+    // 1. Native script detection (most reliable)
+    if (/[\u0B80-\u0BFF]/.test(text)) return 'ta-IN'; // Tamil script
+    if (/[\u0C00-\u0C7F]/.test(text)) return 'te-IN'; // Telugu script
+    if (/[\u0D00-\u0D7F]/.test(text)) return 'ml-IN'; // Malayalam script
     if (/[\u0900-\u097F]/.test(text)) return 'hi-IN'; // Devanagari (Hindi)
-    if (/[\u0C80-\u0CFF]/.test(text)) return 'kn-IN'; // Kannada
+    if (/[\u0C80-\u0CFF]/.test(text)) return 'kn-IN'; // Kannada script
+    // 2. Tanglish fallback (Tamil words in Roman script)
+    if (detectTanglish(text)) return 'ta-IN';
+    // 3. Default
     return 'en-IN';
 }
 
@@ -242,8 +283,9 @@ export default function SawaariAI() {
                 const recognition = new SpeechRecognition();
                 recognition.continuous = false;
                 recognition.interimResults = false;
-                // Support multiple Indian languages
-                recognition.lang = 'en-IN'; // Default, but it auto-detects within the language
+                // Use Tamil recognition — returns native Tamil script from voice input
+                // Falls back to English if the user speaks English words
+                recognition.lang = 'ta-IN';
 
                 setRecording(true);
                 mediaRecorder.current = recognition; // Store reference for stopRecording
